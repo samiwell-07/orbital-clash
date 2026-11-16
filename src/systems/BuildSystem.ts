@@ -1,4 +1,4 @@
-import type { Team, Tower, TowerKind, World } from '../types';
+import type { Team, ThoriumRock, Tower, TowerKind, World } from '../types';
 import { SELL_REFUND, TILE, otherTeam } from '../core/config';
 import { towerStats, upgradeCost } from '../data/towers';
 import { createTower } from '../entities/Tower';
@@ -11,6 +11,7 @@ export interface BuildCheck {
 }
 
 const NO_MONEY = 'NOT ENOUGH THORIUM';
+const NEED_LV3 = 'NEED LV3 RESEARCH';
 
 function fail(reason: string): BuildCheck {
   return { ok: false, reason };
@@ -36,16 +37,17 @@ export function canBuildBasic(world: World, team: Team, kind: TowerKind, col: nu
   if (cell.type === 'rock') return fail('BLOCKED TERRAIN');
   if (cell.type === 'base' || isNearBase(col, row)) return fail('TOO CLOSE TO BASE');
   if (cell.towerId !== null) return fail('OCCUPIED');
+  // Only rocks sitting on (or falling onto) the tile block it; carried/magnet/refining ones don't.
   for (const rock of world.rocks) {
     if (!rock.alive) continue;
     if (rock.state === 'landed' && inCell(rock.x, rock.y, col, row)) return fail('THORIUM HERE');
     if (rock.state === 'falling' && inCell(rock.targetX, rock.targetY, col, row)) return fail('THORIUM HERE');
   }
+  // Air units fly over towers, so only ground units (and the cell they are heading into) block a build.
   for (const u of world.units) {
-    if (!u.alive) continue;
+    if (!u.alive || u.air) continue;
     if (inCell(u.x, u.y, col, row)) return fail('UNIT IN THE WAY');
-    const next = u.path[u.pathIndex];
-    if (next && next.col === col && next.row === row) return fail('UNIT IN THE WAY');
+    if (u.nextCol === col && u.nextRow === row) return fail('UNIT IN THE WAY');
   }
   if (world.players[team].money < towerStats(kind, 0).cost) return fail(NO_MONEY);
   return { ok: true, reason: '' };
@@ -62,7 +64,7 @@ export function canBuild(world: World, team: Team, kind: TowerKind, col: number,
 const extraCell = new Set<number>();
 
 /**
- * True if placing a tower at (col,row) would cut every route for any spawn or live unit.
+ * True if placing a tower at (col,row) would cut every route for any spawn or live GROUND unit.
  * One flood fill per goal base; equivalent to running A* from every spawn / unit cell.
  */
 export function wouldBlockPaths(world: World, col: number, row: number): boolean {
@@ -77,7 +79,7 @@ export function wouldBlockPaths(world: World, col: number, row: number): boolean
       if (inBounds(grid, s.col, s.row) && !floodReaches(grid, reach, s)) return true;
     }
     for (const u of world.units) {
-      if (!u.alive || u.team !== team) continue;
+      if (!u.alive || u.air || u.team !== team) continue;
       const c = pixelToCell(u.x, u.y);
       if (inBounds(grid, c.col, c.row) && !floodReaches(grid, reach, c)) return true;
     }
@@ -121,6 +123,10 @@ export function tryUpgrade(world: World, team: Team, col: number, row: number): 
     return false;
   }
   const player = world.players[team];
+  if (tower.level === 1 && !player.researched.maxLevel3) {
+    reject(world, team, NEED_LV3, col, row);
+    return false;
+  }
   if (player.money < cost) {
     reject(world, team, NO_MONEY, col, row);
     return false;
@@ -130,6 +136,33 @@ export function tryUpgrade(world: World, team: Team, col: number, row: number): 
   tower.totalSpent += cost;
   world.events.push({ type: 'upgrade', team, kind: tower.kind, level: tower.level, x: tower.x, y: tower.y });
   return true;
+}
+
+function landRock(rock: ThoriumRock, x: number, y: number): void {
+  rock.state = 'landed';
+  rock.harvesterId = null;
+  rock.reservedBy = null;
+  rock.magnetTowerId = null;
+  rock.carriedBy = null;
+  rock.x = x;
+  rock.y = y;
+  rock.targetX = x;
+  rock.targetY = y;
+}
+
+/** Kills a station's harvester drones, dropping their cargo where they are and freeing their reservations. */
+function releaseStation(world: World, tower: Tower): void {
+  for (const h of world.harvesters) {
+    if (!h.alive || h.stationId !== tower.id) continue;
+    h.alive = false;
+    for (const rock of world.rocks) {
+      if (!rock.alive) continue;
+      if (rock.harvesterId === h.id || h.cargo.includes(rock.id)) landRock(rock, h.x, h.y);
+      else if (rock.reservedBy === h.id) rock.reservedBy = null;
+    }
+    h.cargo.length = 0;
+    h.targetRockId = null;
+  }
 }
 
 export function trySell(world: World, team: Team, col: number, row: number): boolean {
@@ -147,15 +180,9 @@ export function trySell(world: World, team: Team, col: number, row: number): boo
   setTowerAt(world.grid, col, row, null);
   world.towers = world.towers.filter((t) => t !== tower);
   if (tower.kind === 'refinery') {
+    releaseStation(world, tower);
     for (const rock of world.rocks) {
-      if (!rock.alive || rock.magnetTowerId !== tower.id) continue;
-      rock.state = 'landed';
-      rock.magnetTowerId = null;
-      rock.carriedBy = null;
-      rock.x = tower.x;
-      rock.y = tower.y;
-      rock.targetX = tower.x;
-      rock.targetY = tower.y;
+      if (rock.alive && rock.magnetTowerId === tower.id) landRock(rock, tower.x, tower.y);
     }
     tower.refineQueue.length = 0;
     tower.refineProgress = 0;

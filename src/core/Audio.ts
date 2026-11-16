@@ -4,13 +4,19 @@ const MASTER_GAIN = 0.35;
 const MAX_VOICES = 24;
 const DEFAULT_THROTTLE_MS = 30;
 const THROTTLE_MS: Partial<Record<SfxName, number>> = {
-  laser: 45,
-  cannon: 50,
-  explosion: 60,
-  bigExplosion: 90,
-  cryo: 60,
+  laser: 50,
+  cannon: 60,
+  cryo: 70,
+  plasma: 70,
+  explosion: 70,
+  bigExplosion: 120,
+  cash: 80,
+  pickup: 60,
+  drop: 60,
+  queue: 40,
   baseHit: 120,
   meteor: 150,
+  research: 200,
 };
 
 type Ctx = AudioContext;
@@ -178,6 +184,10 @@ export class AudioFx {
         this.tone(ctx, 'square', t, 0.08, 1900, 650, 0.12 * v);
         this.tone(ctx, 'sawtooth', t, 0.06, 2600, 900, 0.05 * v);
         break;
+      case 'plasma':
+        this.noiseBurst(ctx, t, 0.07, 'highpass', 6000, 3200, 0.16 * v, 3, 0.002);
+        this.tone(ctx, 'sawtooth', t, 0.05, 3400, 2600, 0.035 * v, 0.002);
+        break;
       case 'cannon':
         this.tone(ctx, 'sine', t, 0.25, 160, 45, 0.6 * v);
         this.noiseBurst(ctx, t, 0.15, 'lowpass', 1800, 300, 0.3 * v);
@@ -231,6 +241,12 @@ export class AudioFx {
         break;
       case 'queue':
         this.tone(ctx, 'square', t, 0.03, 1500, 1500, 0.06 * v, 0.002);
+        break;
+      case 'research':
+        this.arpeggio(ctx, t, [523, 659, 784, 1047, 1319], 0.06, 'sine', 0.12 * v);
+        this.tone(ctx, 'triangle', t + 0.3, 0.7, 1568, 1568, 0.06 * v, 0.02);
+        this.tone(ctx, 'triangle', t + 0.3, 0.7, 1576, 1576, 0.05 * v, 0.02);
+        this.noiseBurst(ctx, t + 0.1, 0.6, 'bandpass', 7000, 9000, 0.05 * v, 8, 0.1);
         break;
       case 'menuMove':
         this.tone(ctx, 'square', t, 0.04, 700, 700, 0.06 * v, 0.002);

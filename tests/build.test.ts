@@ -4,7 +4,7 @@ import { ROWS } from '../src/core/config';
 import { createWorld } from '../src/core/World';
 import { VERSUS_LEVEL } from '../src/data/levels';
 import { towerStats } from '../src/data/towers';
-import { createRock } from '../src/entities/ThoriumRock';
+import { createHarvester, createLandedRock, createRock } from '../src/entities/ThoriumRock';
 import { createUnit } from '../src/entities/Unit';
 import { cellCenter, getCell, getSpawnCells, pixelToCell, setTowerAt } from '../src/systems/Grid';
 import { hasPath } from '../src/systems/Pathfinding';
@@ -46,17 +46,26 @@ describe('canBuild', () => {
     falling.y = c.y;
     expect(canBuild(world, 0, 'laser', 10, 3).ok).toBe(true);
     expect(canBuild(world, 0, 'laser', 11, 3).reason).toBe('THORIUM HERE');
+    for (const state of ['carried', 'magnet'] as const) {
+      falling.state = state;
+      expect(canBuild(world, 0, 'laser', 11, 3).ok).toBe(true);
+    }
   });
 
   it('rejects cells under or ahead of a unit', () => {
     const world = makeWorld();
     const c = cellCenter(10, 3);
-    const unit = createUnit(world, 0, 'scout', c.x, c.y);
-    unit.path = [{ col: 10, row: 3 }, { col: 11, row: 3 }];
-    unit.pathIndex = 1;
-    world.units.push(unit);
+    world.units.push(createUnit(world, 0, 'scout', c.x, c.y, 11, 3, 0));
     expect(canBuild(world, 1, 'laser', 10, 3).reason).toBe('UNIT IN THE WAY');
     expect(canBuild(world, 1, 'laser', 11, 3).reason).toBe('UNIT IN THE WAY');
+  });
+
+  it('ignores air units overhead', () => {
+    const world = makeWorld();
+    const c = cellCenter(10, 3);
+    world.units.push(createUnit(world, 0, 'bomber', c.x, c.y, 11, 3, 0));
+    expect(canBuild(world, 1, 'laser', 10, 3).ok).toBe(true);
+    expect(canBuild(world, 1, 'laser', 11, 3).ok).toBe(true);
   });
 
   it('rejects when money is short', () => {
@@ -88,9 +97,19 @@ describe('wouldBlockPaths', () => {
     setTowerAt(world.grid, 11, 3, 901);
     setTowerAt(world.grid, 10, 2, 902);
     const c = cellCenter(10, 3);
-    world.units.push(createUnit(world, 0, 'scout', c.x, c.y));
+    world.units.push(createUnit(world, 0, 'scout', c.x, c.y, 10, 3, 0));
     expect(wouldBlockPaths(world, 10, 4)).toBe(true);
     expect(wouldBlockPaths(world, 10, 5)).toBe(false);
+  });
+
+  it('ignores air units when checking for sealed-in units', () => {
+    const world = makeWorld();
+    setTowerAt(world.grid, 9, 3, 900);
+    setTowerAt(world.grid, 11, 3, 901);
+    setTowerAt(world.grid, 10, 2, 902);
+    const c = cellCenter(10, 3);
+    world.units.push(createUnit(world, 0, 'bomber', c.x, c.y, 10, 3, 0));
+    expect(wouldBlockPaths(world, 10, 4)).toBe(false);
   });
 
   it('agrees with the A*-per-start definition on walled maps', () => {
@@ -102,7 +121,7 @@ describe('wouldBlockPaths', () => {
         for (const s of getSpawnCells(team)) if (!hasPath(world.grid, s, goal, extra)) return true;
       }
       for (const u of world.units) {
-        if (!u.alive) continue;
+        if (!u.alive || u.air) continue;
         const c = pixelToCell(u.x, u.y);
         if (c.col < 0 || c.row < 0 || c.col >= world.grid.cols || c.row >= world.grid.rows) continue;
         if (!hasPath(world.grid, c, u.team === 0 ? 1 : 0, extra)) return true;
@@ -122,7 +141,7 @@ describe('wouldBlockPaths', () => {
         setTowerAt(w.grid, 6, 0, 1201);
         for (const [team, col, row] of [[0, 14, 5], [1, 7, 12], [0, 25, 16], [1, 0, 8], [0, 5, 0]] as [Team, number, number][]) {
           const c = cellCenter(col, row);
-          w.units.push(createUnit(w, team, 'scout', c.x, c.y));
+          w.units.push(createUnit(w, team, 'scout', c.x, c.y, col, row, 0));
         }
       },
       // A ring of towers, and a unit standing on a tower cell in a pocket open only at (22,10).
@@ -130,7 +149,7 @@ describe('wouldBlockPaths', () => {
         for (const [c, r] of [[12, 2], [13, 3], [12, 4], [11, 3]]) setTowerAt(w.grid, c, r, 1300 + c * 20 + r);
         for (const [c, r] of [[22, 9], [23, 9], [22, 8], [21, 9]]) setTowerAt(w.grid, c, r, 1400 + c * 20 + r);
         const c = cellCenter(22, 9);
-        w.units.push(createUnit(w, 1, 'tank', c.x, c.y));
+        w.units.push(createUnit(w, 1, 'tank', c.x, c.y, 22, 9, 0));
       },
     ];
     for (const setup of scenarios) {
@@ -160,26 +179,34 @@ describe('tryBuild / tryUpgrade / trySell', () => {
     expect(world.events.at(-1)?.type).toBe('build');
   });
 
-  it('upgrades up to max level', () => {
+  it('upgrades to level 3 only with maxLevel3 research', () => {
     const world = makeWorld();
     tryBuild(world, 0, 'laser', 10, 3);
     expect(tryUpgrade(world, 1, 10, 3)).toBe(false);
     expect(tryUpgrade(world, 0, 10, 3)).toBe(true);
+    const money = world.players[0].money;
+    world.players[0].cursor.failFlash = 0;
+    expect(tryUpgrade(world, 0, 10, 3)).toBe(false);
+    expect(world.events.at(-1)).toMatchObject({ type: 'buildFail', reason: 'NEED LV3 RESEARCH' });
+    expect(world.players[0].cursor.failFlash).toBe(0.4);
+    expect(world.players[0].money).toBe(money);
+    expect(getTowerAt(world, 10, 3)!.level).toBe(1);
+    world.players[0].researched.maxLevel3 = true;
     expect(tryUpgrade(world, 0, 10, 3)).toBe(true);
     expect(tryUpgrade(world, 0, 10, 3)).toBe(false);
     const t = getTowerAt(world, 10, 3)!;
     expect(t.level).toBe(2);
-    expect(t.totalSpent).toBe(60 + 70 + 110);
+    expect(t.totalSpent).toBe(towerStats('laser', 0).cost + towerStats('laser', 1).cost + towerStats('laser', 2).cost);
   });
 
-  it('sells for 70% and frees the cell', () => {
+  it('sells for 75% and frees the cell', () => {
     const world = makeWorld();
     tryBuild(world, 0, 'cannon', 10, 3);
     tryUpgrade(world, 0, 10, 3);
     const before = world.players[0].money;
     expect(trySell(world, 1, 10, 3)).toBe(false);
     expect(trySell(world, 0, 10, 3)).toBe(true);
-    expect(world.players[0].money - before).toBe(Math.floor((100 + 110) * 0.7));
+    expect(world.players[0].money - before).toBe(Math.floor((towerStats('cannon', 0).cost + towerStats('cannon', 1).cost) * 0.75));
     expect(getCell(world.grid, 10, 3)!.towerId).toBeNull();
     expect(world.towers.length).toBe(0);
     expect(canBuild(world, 0, 'laser', 10, 3).ok).toBe(true);
@@ -208,5 +235,34 @@ describe('tryBuild / tryUpgrade / trySell', () => {
     }
     expect(other.x).toBe(other.startX);
     expect(tower.refineQueue.length).toBe(0);
+  });
+
+  it('selling a refinery kills its harvesters and drops their cargo', () => {
+    const world = makeWorld();
+    tryBuild(world, 0, 'refinery', 10, 3);
+    tryBuild(world, 0, 'refinery', 14, 3);
+    const tower = getTowerAt(world, 10, 3)!;
+    const keep = getTowerAt(world, 14, 3)!;
+    const drone = createHarvester(world, 0, tower.id, 300, 220);
+    const otherDrone = createHarvester(world, 0, keep.id, 500, 220);
+    const cargo = createRock(world, 300, 220);
+    cargo.state = 'carried';
+    cargo.harvesterId = drone.id;
+    cargo.reservedBy = drone.id;
+    drone.cargo.push(cargo.id);
+    drone.state = 'returning';
+    const reserved = createLandedRock(world, 400, 400);
+    reserved.reservedBy = drone.id;
+    const othersReserved = createLandedRock(world, 450, 400);
+    othersReserved.reservedBy = otherDrone.id;
+    world.harvesters.push(drone, otherDrone);
+    world.rocks.push(cargo, reserved, othersReserved);
+    expect(trySell(world, 0, 10, 3)).toBe(true);
+    expect(drone.alive).toBe(false);
+    expect(drone.cargo.length).toBe(0);
+    expect(otherDrone.alive).toBe(true);
+    expect(cargo).toMatchObject({ state: 'landed', harvesterId: null, reservedBy: null, x: 300, y: 220 });
+    expect(reserved.reservedBy).toBeNull();
+    expect(othersReserved.reservedBy).toBe(otherDrone.id);
   });
 });

@@ -7,7 +7,7 @@ const GAME_KEYS = new Set<string>([
   'Numpad0', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5',
   'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9',
   'NumpadAdd', 'NumpadSubtract', 'NumpadMultiply', 'NumpadDivide', 'NumpadDecimal',
-  'BracketLeft', 'BracketRight',
+  'Semicolon', 'Comma', 'Period', 'Slash', 'Backquote', 'Quote', 'F2',
 ]);
 
 export interface MouseState {

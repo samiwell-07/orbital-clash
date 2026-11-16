@@ -1,51 +1,41 @@
-import type { Base, Team, Unit, UnitKind, World } from '../types';
-import { COLORS, TEAM_COLORS, TILE, otherTeam } from '../core/config';
-import { pick, randRange } from '../core/Random';
+import type { Base, GridPos, Team, Unit, UnitKind, World } from '../types';
+import { COLORS, TILE, otherTeam, paletteOf } from '../core/config';
 import { UNIT_DEFS } from '../data/units';
 import { createUnit } from '../entities/Unit';
-import { cellCenter, getCell, inBounds, isPassable, pixelToCell } from './Grid';
-import { findPath } from './Pathfinding';
+import { nextStep, updateFlowFields } from './FlowField';
+import { rebuildSpatial } from './Spatial';
 import { addRing, addShake, emitBurst } from './ParticleSystem';
 
-/** Spawns a unit on a random free spawn cell of `team`, pushes it to world.units and returns it. */
-export function spawnUnit(world: World, team: Team, kind: UnitKind): Unit {
-  const player = world.players[team];
-  const free = player.spawnCells.filter((c) => isPassable(world.grid, c.col, c.row));
-  const candidates = free.length > 0 ? free : player.spawnCells;
-  const c = candidates.length > 0 ? pick(world.rng, candidates) : { col: world.bases[team].col, row: world.bases[team].row };
-  const center = cellCenter(c.col, c.row);
-  const j = TILE * 0.2;
-  const x = center.x + randRange(world.rng, -j, j);
-  const y = center.y + randRange(world.rng, -j, j);
-  const unit = createUnit(world, team, kind, x, y);
+/** Grid version each world's ground units last routed against. */
+const routedVersion = new WeakMap<World, number>();
+
+const HALF = TILE / 2;
+
+/** Spawns a unit exactly at the center of `spawnCell` (no jitter, so trains stay single-file). */
+export function spawnUnit(world: World, team: Team, kind: UnitKind, spawnCell: GridPos, trainIndex: number): Unit {
+  const x = spawnCell.col * TILE + HALF;
+  const y = spawnCell.row * TILE + HALF;
+  const unit = createUnit(world, team, kind, x, y, spawnCell.col, spawnCell.row, trainIndex);
   world.units.push(unit);
-  player.stats.unitsSent++;
-  emitBurst(world, x, y, TEAM_COLORS[team].bright, 8, 70, 0.4, 2);
+  world.players[team].stats.unitsSent++;
+  emitBurst(world, x, y, paletteOf(world.players[team]).bright, unit.air ? 4 : 2, 60, 0.3, 1.8);
   return unit;
 }
 
-function clampCell(world: World, x: number, y: number): { col: number; row: number } {
-  const c = pixelToCell(x, y);
-  return {
-    col: Math.max(0, Math.min(world.grid.cols - 1, c.col)),
-    row: Math.max(0, Math.min(world.grid.rows - 1, c.row)),
-  };
-}
-
-function isEnemyBaseCell(world: World, unit: Unit, x: number, y: number): boolean {
-  const c = pixelToCell(x, y);
-  if (!inBounds(world.grid, c.col, c.row)) return false;
-  const cell = getCell(world.grid, c.col, c.row);
-  return cell !== null && cell.type === 'base' && cell.baseTeam === otherTeam(unit.team);
+function isEnemyBaseCell(world: World, team: Team, col: number, row: number): boolean {
+  const g = world.grid;
+  if (col < 0 || row < 0 || col >= g.cols || row >= g.rows) return false;
+  const cell = g.cells[row * g.cols + col]!;
+  return cell.type === 'base' && cell.baseTeam !== team;
 }
 
 /** Distance from (x,y) to the base rectangle (0 when inside). */
-function distToBase(base: Base, x: number, y: number): number {
+export function distToBase(base: Base, x: number, y: number): number {
   const left = base.col * TILE;
   const top = base.row * TILE;
   const dx = Math.max(left - x, 0, x - (left + base.w * TILE));
   const dy = Math.max(top - y, 0, y - (top + base.h * TILE));
-  return Math.hypot(dx, dy);
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 function hitBase(world: World, unit: Unit): void {
@@ -57,11 +47,12 @@ function hitBase(world: World, unit: Unit): void {
   base.hp -= damage;
   base.hitFlash = 0.3;
   world.events.push({ type: 'baseHit', team: enemy, damage });
-  addShake(world, 4 + damage * 0.4);
-  emitBurst(world, unit.x, unit.y, COLORS.explosion, 20, 170, 0.55, 3);
-  emitBurst(world, unit.x, unit.y, TEAM_COLORS[unit.team].main, 10, 120, 0.45, 2.5);
-  addRing(world, unit.x, unit.y, TILE * 1.1, TEAM_COLORS[enemy].bright, 0.4);
-  world.events.push({ type: 'explosion', x: unit.x, y: unit.y, big: damage >= 10 });
+  addShake(world, 2 + damage * 0.6);
+  const big = damage >= 4;
+  emitBurst(world, unit.x, unit.y, COLORS.explosion, big ? 16 : 6, 160, 0.5, 3);
+  emitBurst(world, unit.x, unit.y, paletteOf(world.players[unit.team]).main, big ? 8 : 3, 120, 0.4, 2.5);
+  if (big) addRing(world, unit.x, unit.y, TILE * 1.1, paletteOf(world.players[enemy]).bright, 0.4);
+  world.events.push({ type: 'explosion', x: unit.x, y: unit.y, big });
   if (base.hp <= 0) {
     base.hp = 0;
     world.winner = unit.team;
@@ -69,23 +60,98 @@ function hitBase(world: World, unit: Unit): void {
   }
 }
 
-function repath(world: World, unit: Unit): void {
-  const start = clampCell(world, unit.x, unit.y);
-  const path = findPath(world.grid, start, otherTeam(unit.team));
-  unit.pathVersion = world.grid.version;
-  if (!path) return;
-  unit.path = path;
-  unit.pathIndex = path.length > 1 ? 1 : 0;
+function cellOf(world: World, x: number, y: number): number {
+  const g = world.grid;
+  let c = Math.floor(x / TILE);
+  let r = Math.floor(y / TILE);
+  if (c < 0) c = 0;
+  else if (c >= g.cols) c = g.cols - 1;
+  if (r < 0) r = 0;
+  else if (r >= g.rows) r = g.rows - 1;
+  return r * g.cols + c;
 }
 
-/** Moves units along A* paths (re-path when grid.version changes), applies slow, handles base hits. */
+/**
+ * Picks the waypoint after (col,row) via nextStep (which already falls back to any reachable neighbour when the
+ * cell is blocked/unreachable). If even that fails, steps straight toward the enemy base.
+ */
+function route(world: World, unit: Unit, col: number, row: number): void {
+  const step = nextStep(world, unit.team, col, row);
+  if (step) {
+    unit.nextCol = step.col;
+    unit.nextRow = step.row;
+    return;
+  }
+  // Completely cut off: walk straight toward the enemy base, one cell at a time.
+  const base = world.bases[otherTeam(unit.team)];
+  const bc = base.col + (base.w >> 1);
+  const br = base.row + (base.h >> 1);
+  const dc = bc - col;
+  const dr = br - row;
+  const horizontal = Math.abs(dc) >= Math.abs(dr);
+  unit.nextCol = horizontal ? col + Math.sign(dc) : col;
+  unit.nextRow = horizontal ? row : row + Math.sign(dr);
+}
+
+function moveGround(world: World, unit: Unit, move: number): void {
+  const reroute = routedVersion.get(world) !== world.grid.version;
+  if (reroute) {
+    const idx = cellOf(world, unit.x, unit.y);
+    const col = idx % world.grid.cols;
+    const row = Math.floor(idx / world.grid.cols);
+    const nextCell = world.grid.cells[unit.nextRow * world.grid.cols + unit.nextCol];
+    const nextBlocked = nextCell !== undefined && nextCell.towerId !== null;
+    // Already inside its (still open) waypoint cell: finish reaching the center; arrival re-queries the new field.
+    if (nextBlocked || col !== unit.nextCol || row !== unit.nextRow) route(world, unit, col, row);
+  }
+  for (let guard = 0; guard < 8 && move > 0; guard++) {
+    const tx = unit.nextCol * TILE + HALF;
+    const ty = unit.nextRow * TILE + HALF;
+    const dx = tx - unit.x;
+    const dy = ty - unit.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (isEnemyBaseCell(world, unit.team, unit.nextCol, unit.nextRow) && d - move <= HALF) {
+      hitBase(world, unit);
+      return;
+    }
+    if (d > 0.0001) unit.angle = Math.atan2(dy, dx);
+    if (d <= move) {
+      unit.x = tx;
+      unit.y = ty;
+      move -= d;
+      route(world, unit, unit.nextCol, unit.nextRow);
+    } else {
+      unit.x += (dx / d) * move;
+      unit.y += (dy / d) * move;
+      move = 0;
+    }
+  }
+}
+
+function moveAir(world: World, unit: Unit, move: number): void {
+  const base = world.bases[otherTeam(unit.team)];
+  const dx = base.x - unit.x;
+  const dy = base.y - unit.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d > 0.0001) {
+    unit.angle = Math.atan2(dy, dx);
+    const k = Math.min(1, move / d);
+    unit.x += dx * k;
+    unit.y += dy * k;
+  }
+  if (distToBase(base, unit.x, unit.y) <= TILE * 0.25) hitBase(world, unit);
+}
+
+/** Moves ground units along the flow fields and air units straight at the enemy base; handles base hits. */
 export function updateMovement(world: World, dt: number): void {
-  const reachDist = TILE * 0.6;
-  for (const unit of world.units) {
+  updateFlowFields(world);
+  const units = world.units;
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i]!;
     if (!unit.alive) continue;
     const def = UNIT_DEFS[unit.kind];
     unit.age += dt;
-    unit.hitFlash = Math.max(0, unit.hitFlash - dt);
+    if (unit.hitFlash > 0) unit.hitFlash = Math.max(0, unit.hitFlash - dt);
     if (unit.slowTimer > 0) {
       unit.slowTimer -= dt;
       if (unit.slowTimer <= 0) {
@@ -98,38 +164,17 @@ export function updateMovement(world: World, dt: number): void {
       const scale = def.maxShield > 0 ? unit.maxShield / def.maxShield : 1;
       unit.shield = Math.min(unit.maxShield, unit.shield + def.shieldRegen * scale * dt);
     }
-
-    if (unit.pathVersion !== world.grid.version || unit.path.length === 0) repath(world, unit);
-
-    let move = unit.speed * TILE * unit.slowFactor * dt;
-    while (move > 0 && unit.pathIndex < unit.path.length) {
-      const wp = unit.path[unit.pathIndex]!;
-      const target = cellCenter(wp.col, wp.row);
-      const dx = target.x - unit.x;
-      const dy = target.y - unit.y;
-      const d = Math.hypot(dx, dy);
-      if (d > 0.0001) unit.angle = Math.atan2(dy, dx);
-      if (d <= move) {
-        unit.x = target.x;
-        unit.y = target.y;
-        move -= d;
-        unit.pathIndex++;
-      } else {
-        unit.x += (dx / d) * move;
-        unit.y += (dy / d) * move;
-        move = 0;
-      }
-    }
-
-    const enemyBase = world.bases[otherTeam(unit.team)];
-    const pathDone = unit.path.length > 0 && unit.pathIndex >= unit.path.length;
-    if (
-      isEnemyBaseCell(world, unit, unit.x, unit.y) ||
-      distToBase(enemyBase, unit.x, unit.y) <= reachDist * 0.25 ||
-      (pathDone && distToBase(enemyBase, unit.x, unit.y) <= reachDist)
-    ) {
-      hitBase(world, unit);
-    }
+    const move = unit.speed * TILE * unit.slowFactor * dt;
+    if (unit.air) moveAir(world, unit, move);
+    else moveGround(world, unit, move);
   }
-  if (world.units.some((u) => !u.alive)) world.units = world.units.filter((u) => u.alive);
+  routedVersion.set(world, world.grid.version);
+
+  let w = 0;
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i]!;
+    if (u.alive) units[w++] = u;
+  }
+  units.length = w;
+  rebuildSpatial(world.spatial, units);
 }

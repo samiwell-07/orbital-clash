@@ -1,6 +1,10 @@
 import type { MenuView, Rect, ViewState } from '../types';
-import { CANVAS_H, CANVAS_W, COLORS, TEAM_COLORS } from '../core/config';
+import { CANVAS_H, CANVAS_W, COLORS, PALETTES } from '../core/config';
 import { angledRectPath, font, withGlow } from './theme';
+
+const NEON_A = COLORS.circuit;
+const NEON_B = PALETTES.purple.main;
+const NEON_A_GLOW = 'rgba(47,230,255,0.6)';
 
 const ITEM_W = 340;
 const ITEM_H = 44;
@@ -54,17 +58,17 @@ export function drawMenu(ctx: CanvasRenderingContext2D, menu: MenuView, view: Vi
   ctx.font = font(titleSize, 900);
   const tw = ctx.measureText(menu.title).width;
   const grad = ctx.createLinearGradient(cx - tw / 2, 0, cx + tw / 2, 0);
-  grad.addColorStop(0, TEAM_COLORS[0].main);
-  grad.addColorStop(0.5, '#e6f1ff');
-  grad.addColorStop(1, TEAM_COLORS[1].main);
+  grad.addColorStop(0, NEON_A);
+  grad.addColorStop(0.5, '#f2e9ff');
+  grad.addColorStop(1, NEON_B);
   // Occasional flicker.
   const flick = Math.sin(t * 37) > 0.97 || Math.sin(t * 2.3 + 1) > 0.995 ? 0.55 : 1;
   ctx.globalAlpha = flick;
-  withGlow(ctx, TEAM_COLORS[0].glow, 28, () => {
+  withGlow(ctx, NEON_A_GLOW, 28, () => {
     ctx.fillStyle = grad;
     ctx.fillText(menu.title, cx, L.titleY);
   });
-  withGlow(ctx, TEAM_COLORS[1].glow, 14, () => {
+  withGlow(ctx, PALETTES.purple.glow, 14, () => {
     ctx.fillStyle = grad;
     ctx.fillText(menu.title, cx, L.titleY);
   });
@@ -79,10 +83,10 @@ export function drawMenu(ctx: CanvasRenderingContext2D, menu: MenuView, view: Vi
 
   // Underline.
   const ul = ctx.createLinearGradient(cx - tw / 2, 0, cx + tw / 2, 0);
-  ul.addColorStop(0, 'rgba(25,211,255,0)');
-  ul.addColorStop(0.3, TEAM_COLORS[0].main);
-  ul.addColorStop(0.7, TEAM_COLORS[1].main);
-  ul.addColorStop(1, 'rgba(255,90,31,0)');
+  ul.addColorStop(0, 'rgba(47,230,255,0)');
+  ul.addColorStop(0.3, NEON_A);
+  ul.addColorStop(0.7, NEON_B);
+  ul.addColorStop(1, 'rgba(180,92,255,0)');
   ctx.fillStyle = ul;
   ctx.fillRect(cx - tw / 2, L.titleY + titleSize * 0.55, tw, 2);
 
@@ -100,18 +104,18 @@ export function drawMenu(ctx: CanvasRenderingContext2D, menu: MenuView, view: Vi
     const pulse = 0.5 + 0.5 * Math.sin(t * 5);
     ctx.beginPath();
     angledRectPath(ctx, r.x, r.y, r.w, r.h, 12);
-    ctx.fillStyle = sel ? `rgba(25,211,255,${0.16 + 0.08 * pulse})` : 'rgba(10,16,32,0.72)';
+    ctx.fillStyle = sel ? `rgba(47,230,255,${0.16 + 0.08 * pulse})` : 'rgba(16,12,32,0.78)';
     ctx.fill();
     if (sel) {
-      withGlow(ctx, TEAM_COLORS[0].main, 10 + 8 * pulse, () => {
+      withGlow(ctx, NEON_A, 10 + 8 * pulse, () => {
         ctx.beginPath();
         angledRectPath(ctx, r.x, r.y, r.w, r.h, 12);
-        ctx.strokeStyle = TEAM_COLORS[0].main;
+        ctx.strokeStyle = NEON_A;
         ctx.lineWidth = 2;
         ctx.stroke();
       });
     } else {
-      ctx.strokeStyle = 'rgba(140,180,255,0.3)';
+      ctx.strokeStyle = 'rgba(180,140,255,0.35)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -120,7 +124,7 @@ export function drawMenu(ctx: CanvasRenderingContext2D, menu: MenuView, view: Vi
     ctx.fillText(menu.items[i]!, cx, r.y + r.h / 2 + 1);
     if (sel) {
       const off = 4 * pulse;
-      ctx.fillStyle = TEAM_COLORS[0].main;
+      ctx.fillStyle = NEON_A;
       ctx.font = font(18, 800);
       ctx.fillText('>', r.x + 22 + off, r.y + r.h / 2 + 1);
       ctx.fillText('<', r.x + r.w - 22 - off, r.y + r.h / 2 + 1);
@@ -132,9 +136,9 @@ export function drawMenu(ctx: CanvasRenderingContext2D, menu: MenuView, view: Vi
     const r = L.lines;
     ctx.beginPath();
     angledRectPath(ctx, r.x, r.y, r.w, r.h, 12);
-    ctx.fillStyle = 'rgba(6,10,22,0.82)';
+    ctx.fillStyle = 'rgba(12,9,26,0.85)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(140,180,255,0.25)';
+    ctx.strokeStyle = 'rgba(180,140,255,0.28)';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.font = font(13, 500);

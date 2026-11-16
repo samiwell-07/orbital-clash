@@ -1,13 +1,16 @@
-import type { GameEvent, GameMode, MenuView, Team, ViewState, World } from '../types';
+import type { BuildAction, GameEvent, GameMode, MenuView, SfxName, Team, ViewState, World } from '../types';
 import type { Input } from './Input';
 import type { AudioFx } from './Audio';
 import type { Renderer } from '../ui/Renderer';
-import { COLORS, SAVE_KEY, TEAM_COLORS } from './config';
+import type { KeyBindings } from '../data/controls';
+import { COLORS, SAVE_KEY, paletteOf } from './config';
 import { createWorld } from './World';
 import { getLevel, VERSUS_LEVEL } from '../data/levels';
-import { PlayerController, P1_BINDINGS, P2_BINDINGS } from '../controllers/PlayerController';
+import { MUTE_CODES, P1_BINDINGS, P2_BINDINGS, PAUSE_CODES } from '../data/controls';
+import { RESEARCH_DEFS } from '../data/units';
+import { PlayerController } from '../controllers/PlayerController';
 import { AIController } from '../controllers/AIController';
-import { updateMeteors } from '../systems/MeteorSystem';
+import { seedInitialDeposits, updateMeteors } from '../systems/MeteorSystem';
 import { updateWaves } from '../systems/WaveSystem';
 import { updateMovement } from '../systems/MovementSystem';
 import { updateCombat } from '../systems/CombatSystem';
@@ -18,6 +21,10 @@ import { getMenuItemRects } from '../ui/MenuScreen';
 const GAME_OVER_DELAY = 1.5;
 const BANNER_TIME = 2.2;
 const SHORT_BANNER_TIME = 1.2;
+/** A low-priority banner may not replace any banner younger than this (seconds). */
+const BANNER_MIN_SHOW = 0.6;
+/** Minimum real time between two build-failure banners. */
+const FAIL_BANNER_INTERVAL = 0.8;
 
 const MENU_UP = ['ArrowUp', 'KeyW'] as const;
 const MENU_DOWN = ['ArrowDown', 'KeyS'] as const;
@@ -45,6 +52,57 @@ function saveUnlocked(level: number): void {
   }
 }
 
+const KEY_NAMES: Record<string, string> = {
+  Semicolon: ';',
+  Comma: ',',
+  Period: '.',
+  Slash: '/',
+  Backquote: '`',
+  Escape: 'ESC',
+  Space: 'SPACE',
+  Enter: 'ENTER',
+};
+
+/** Human-readable name of a KeyboardEvent.code. */
+export function keyName(code: string): string {
+  const named = KEY_NAMES[code];
+  if (named) return named;
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  return code.toUpperCase();
+}
+
+function slotKeys(b: KeyBindings, type: BuildAction['type'], alt: boolean): string {
+  const keys: string[] = [];
+  for (const s of b.slots) {
+    if (s.action.type !== type) continue;
+    const code = alt ? s.codes[1] : undefined;
+    keys.push(alt ? (code ? keyName(code) : '') : s.label);
+  }
+  return keys.filter((k) => k !== '').join(' ');
+}
+
+/** Controls summary lines built from the binding tables (single source of truth). */
+export function controlLines(prefix: string, b: KeyBindings): string[] {
+  const hasAlt = b.slots.some((s) => s.codes.length > 1);
+  const pad = ' '.repeat(prefix.length);
+  const lines = [
+    `${prefix}  ${b.moveLabel} move \u00B7 ${b.actLabel} act \u00B7 towers ${slotKeys(b, 'build', false)} \u00B7 send ${slotKeys(b, 'send', false)}` +
+      ` \u00B7 launch ${slotKeys(b, 'launch', false)}`,
+    `${pad}  upgrade ${slotKeys(b, 'upgrade', false)} \u00B7 sell ${slotKeys(b, 'sell', false)} \u00B7 research ${slotKeys(b, 'research', false)}`,
+  ];
+  if (hasAlt) {
+    lines.push(
+      `${pad}  alt keys: towers ${slotKeys(b, 'build', true)} \u00B7 send ${slotKeys(b, 'send', true)} \u00B7 launch ${slotKeys(b, 'launch', true)}` +
+        ` \u00B7 upgrade ${slotKeys(b, 'upgrade', true)} \u00B7 sell ${slotKeys(b, 'sell', true)} \u00B7 research ${slotKeys(b, 'research', true)}`,
+    );
+  }
+  return lines;
+}
+
+const GLOBAL_LINE =
+  `${PAUSE_CODES.map(keyName).join('/')} pause \u00B7 ${MUTE_CODES.map(keyName).join(' or ')} mute`;
+
 /** Screen state machine + per-step orchestration of controllers and systems. */
 export class Game {
   private world: World | null = null;
@@ -54,6 +112,10 @@ export class Game {
   private selectedLevel = this.unlockedLevel;
   private playingLevel = 1;
   private gameOverTimer = -1;
+  private bannerShownAt = -Infinity;
+  private lastFailBanner = -Infinity;
+  /** Sounds already played during the current event drain (one per name per step). */
+  private readonly playedThisStep = new Set<SfxName>();
   private readonly view: ViewState;
 
   constructor(
@@ -84,7 +146,7 @@ export class Game {
       if (this.view.banner.time <= 0) this.view.banner = null;
     }
 
-    if (this.input.wasPressed('KeyM')) {
+    if (this.input.wasAnyPressed(MUTE_CODES)) {
       this.view.muted = this.audio.toggleMute();
       if (this.view.screen === 'menu') this.openMainMenu(this.view.menu?.selected ?? 0);
     }
@@ -114,7 +176,10 @@ export class Game {
     this.mode = mode;
     this.playingLevel = level;
     const def = mode === 'single' ? getLevel(level) : VERSUS_LEVEL;
-    this.world = createWorld(mode, def, Date.now());
+    const world = createWorld(mode, def, Date.now());
+    seedInitialDeposits(world);
+    world.events.length = 0;
+    this.world = world;
     this.controllers = [
       new PlayerController(0, P1_BINDINGS, mode === 'single'),
       mode === 'single' ? new AIController(1, def) : new PlayerController(1, P2_BINDINGS, false),
@@ -123,7 +188,8 @@ export class Game {
     this.view.screen = 'playing';
     this.view.menu = null;
     this.view.level = mode === 'single' ? level : 0;
-    this.view.banner = { text: mode === 'single' ? `LEVEL ${level}` : 'VERSUS', color: COLORS.text, time: BANNER_TIME };
+    this.view.banner = null;
+    this.setBanner(mode === 'single' ? `LEVEL ${level}` : 'VERSUS', COLORS.text, BANNER_TIME, true);
   }
 
   private updatePlaying(dt: number): void {
@@ -131,9 +197,7 @@ export class Game {
     if (!world) return;
     const ending = this.gameOverTimer >= 0;
 
-    // P is a P2 slot key in versus mode, so only Escape pauses there.
-    const pauseKeys = this.mode === 'versus' ? ['Escape'] : ['Escape', 'KeyP'];
-    if (!ending && this.input.wasAnyPressed(pauseKeys)) {
+    if (!ending && this.input.wasAnyPressed(PAUSE_CODES)) {
       this.openPauseMenu();
       this.audio.play('menuSelect');
       return;
@@ -164,6 +228,7 @@ export class Game {
 
   private drainEvents(world: World): void {
     const events = world.events;
+    this.playedThisStep.clear();
     for (let i = 0; i < events.length; i++) {
       const e = events[i];
       if (e) this.handleEvent(world, e);
@@ -171,64 +236,82 @@ export class Game {
     events.length = 0;
   }
 
+  /** Plays a sound at most once per sim step (Audio additionally throttles per name). */
+  private sfx(name: SfxName, volume = 1): void {
+    if (this.playedThisStep.has(name)) return;
+    this.playedThisStep.add(name);
+    this.audio.play(name, volume);
+  }
+
+  private isHuman(world: World, team: Team): boolean {
+    return world.players[team].controller !== 'ai';
+  }
+
   private handleEvent(world: World, e: GameEvent): void {
-    const audio = this.audio;
     switch (e.type) {
       case 'shot':
-        if (e.kind === 'laser') audio.play('laser', 0.5);
-        else if (e.kind === 'cannon') audio.play('cannon');
-        else if (e.kind === 'cryo') audio.play('cryo', 0.6);
+        if (e.kind === 'laser') this.sfx('laser', 0.45);
+        else if (e.kind === 'cannon') this.sfx('cannon', 0.8);
+        else if (e.kind === 'cryo') this.sfx('cryo', 0.55);
+        else if (e.kind === 'plasma') this.sfx('plasma', 0.35);
         break;
       case 'explosion':
-        audio.play(e.big ? 'bigExplosion' : 'explosion');
+        this.sfx(e.big ? 'bigExplosion' : 'explosion', e.big ? 1 : 0.6);
         break;
       case 'unitKilled':
         break;
       case 'build':
-        audio.play('build');
+        this.sfx('build');
         break;
       case 'upgrade':
-        audio.play('upgrade');
+        this.sfx('upgrade');
         break;
       case 'sell':
-        audio.play('sell');
+        this.sfx('sell');
         break;
       case 'buildFail':
-        audio.play('error');
-        if (world.players[e.team].controller !== 'ai' && e.reason) {
-          this.setBanner(e.reason.toUpperCase(), COLORS.warning, SHORT_BANNER_TIME);
-        }
+        if (!this.isHuman(world, e.team)) break;
+        this.sfx('error', 0.7);
+        if (e.reason) this.failBanner(e.reason.toUpperCase());
         break;
       case 'notEnoughMoney':
-        audio.play('error');
-        if (world.players[e.team].controller !== 'ai') {
-          this.setBanner('NOT ENOUGH MONEY', COLORS.warning, SHORT_BANNER_TIME);
-        }
+        if (!this.isHuman(world, e.team)) break;
+        this.sfx('error', 0.7);
+        this.failBanner('NOT ENOUGH THORIUM');
         break;
       case 'rockPickup':
-        audio.play('pickup');
+        this.sfx('pickup');
         break;
       case 'rockDrop':
-        audio.play('drop');
+        this.sfx('drop');
         break;
       case 'rockRefined':
-        audio.play('cash');
+        this.sfx('cash', 0.6);
         break;
       case 'meteorShower':
-        audio.play('meteor');
-        this.setBanner('METEOR SHOWER!', COLORS.thorium, BANNER_TIME);
+        this.sfx('meteor');
+        this.setBanner('METEOR SHOWER!', COLORS.thorium, BANNER_TIME, true);
         break;
       case 'rockLanded':
         break;
       case 'baseHit':
-        audio.play('baseHit');
+        this.sfx('baseHit', 0.8);
         break;
-      case 'waveLaunched':
-        audio.play('wave');
-        this.setBanner(`WAVE ${e.wave} LAUNCHED`, COLORS.text, BANNER_TIME);
+      case 'waveLaunched': {
+        const pal = paletteOf(world.players[e.team]);
+        this.sfx('wave');
+        this.setBanner(`${pal.name} LAUNCHES ${e.count} UNITS`, pal.main, BANNER_TIME, true);
         break;
+      }
+      case 'research': {
+        const player = world.players[e.team];
+        const text = `${RESEARCH_DEFS[e.kind].name.toUpperCase()} UNLOCKED`;
+        this.sfx('research');
+        this.setBanner(this.isHuman(world, e.team) ? text : `${paletteOf(player).name}: ${text}`, COLORS.research, BANNER_TIME, true);
+        break;
+      }
       case 'unitQueued':
-        audio.play('queue');
+        if (this.isHuman(world, e.team)) this.sfx('queue', 0.6);
         break;
       case 'gameOver':
         if (this.gameOverTimer < 0) this.gameOverTimer = GAME_OVER_DELAY;
@@ -236,8 +319,24 @@ export class Game {
     }
   }
 
-  private setBanner(text: string, color: string, time: number): void {
+  private failBanner(text: string): void {
+    const now = this.view.realTime;
+    if (now - this.lastFailBanner < FAIL_BANNER_INTERVAL) return;
+    if (this.setBanner(text, COLORS.warning, SHORT_BANNER_TIME, false)) this.lastFailBanner = now;
+  }
+
+  /** Important banners always show; others never replace a banner that just appeared. */
+  private setBanner(text: string, color: string, time: number, important: boolean): boolean {
+    const now = this.view.realTime;
+    const current = this.view.banner;
+    if (current && current.text === text) {
+      current.time = Math.max(current.time, time);
+      return true;
+    }
+    if (!important && current && now - this.bannerShownAt < BANNER_MIN_SHOW) return false;
     this.view.banner = { text, color, time };
+    this.bannerShownAt = now;
+    return true;
   }
 
   // ------------------------------------------------------------ menus
@@ -253,18 +352,18 @@ export class Game {
     this.view.level = this.selectedLevel;
     this.setMenu({
       title: 'ORBITAL CLASH',
-      subtitle: 'A NEON REVERSE TOWER DEFENSE',
+      subtitle: 'SWARM \u00B7 BUILD \u00B7 HARVEST \u00B7 LAUNCH',
       items: [
-        `1 PLAYER  VS AI   \u25C0 LEVEL ${this.selectedLevel} \u25B6`,
-        '2 PLAYERS  LOCAL VERSUS',
+        `1 PLAYER VS AI  \u25C0 LEVEL ${this.selectedLevel} \u25B6`,
+        '2 PLAYERS LOCAL VERSUS',
         'HOW TO PLAY',
         `SOUND: ${this.audio.muted ? 'OFF' : 'ON'}`,
       ],
       selected,
       lines: [
-        'P1: WASD move \u00B7 SPACE action \u00B7 1-7 build/send \u00B7 R upgrade \u00B7 F sell \u00B7 mouse in 1P',
-        'P2: ARROWS move \u00B7 ENTER action \u00B7 NUMPAD 1-7 or U I O P J K L \u00B7 [ / ] upgrade/sell',
-        'ESC pause \u00B7 M mute \u00B7 \u2191\u2193 choose \u00B7 \u2190\u2192 level \u00B7 ENTER select',
+        `P1  ${P1_BINDINGS.moveLabel} move \u00B7 ${P1_BINDINGS.actLabel} act \u00B7 mouse + sidebar in 1P`,
+        `P2  ${P2_BINDINGS.moveLabel} move \u00B7 ${P2_BINDINGS.actLabel} act \u00B7 numpad or Y-P / H-L / N M ; , . /`,
+        `${GLOBAL_LINE} \u00B7 \u2191\u2193 choose \u00B7 \u2190\u2192 level \u00B7 ENTER select`,
       ],
     });
   }
@@ -277,18 +376,18 @@ export class Game {
       items: ['BACK'],
       selected: 0,
       lines: [
-        'Build towers to defend your base and buy units that march on the enemy base.',
-        'Units launch together every wave; each wave also pays income to both sides.',
-        'Towers can block paths, but never seal them off completely.',
-        'Meteor showers drop Thorium rocks. Grab them with your drone (the cursor),',
-        'or build a Magnet Refinery: it pulls nearby rocks in and refines them into cash.',
-        'Killing enemy units pays a bounty. Bring the enemy base to 0 HP to win.',
+        'Build towers into mazes. You can never fully seal the path to a base.',
+        'Buy unit packs into your wave buffer, then LAUNCH them all as one long train.',
+        'Bombers fly straight over the maze: only Lasers and Plasma Lances hit them.',
+        'Meteor showers drop Thorium. Harvest Stations send drones to mine it;',
+        'your ship can carry one rock too. Refining pays Thorium + research energy.',
+        'Research unlocks tower level 3, faster swarms and double harvester cargo.',
+        'Kills pay a bounty. Bring the enemy base to 0 HP to win.',
         '',
-        'P1  WASD move \u00B7 SPACE pick up/drop/build/upgrade \u00B7 1-4 select tower \u00B7 5-7 send unit',
-        '    R upgrade \u00B7 F sell \u00B7 Q/E cycle tower \u00B7 mouse: click = action, right click = drop',
-        'P2  ARROWS move \u00B7 ENTER action \u00B7 NUMPAD 1-7 or U I O P J K L slots',
-        '    NUMPAD + or [ upgrade \u00B7 NUMPAD - or ] sell',
-        'ESC pause (P too in 1P) \u00B7 M mute',
+        ...controlLines('P1', P1_BINDINGS),
+        'P1 mouse (1P): left click = act / sidebar \u00B7 right click = sell own tower or drop rock',
+        ...controlLines('P2', P2_BINDINGS),
+        GLOBAL_LINE,
       ],
     });
   }
@@ -319,10 +418,12 @@ export class Game {
 
     this.audio.play(!single || won ? 'victory' : 'defeat');
 
-    const title = single ? (won ? 'VICTORY' : 'DEFEAT') : `${TEAM_COLORS[winner].name} WINS`;
-    const statLine = (team: Team, label: string): string => {
-      const s = world.players[team].stats;
-      return `${label}  KILLS ${s.kills} \u00B7 ROCKS REFINED ${s.rocksRefined} \u00B7 UNITS SENT ${s.unitsSent}`;
+    const title = single ? (won ? 'VICTORY' : 'DEFEAT') : `${paletteOf(world.players[winner]).name} WINS`;
+    const statLine = (team: Team): string => {
+      const p = world.players[team];
+      const label = single ? (team === 0 ? 'YOU' : 'AI') : paletteOf(p).name;
+      const s = p.stats;
+      return `${label}  KILLS ${s.kills} \u00B7 LAUNCHES ${s.launches} \u00B7 UNITS SENT ${s.unitsSent} \u00B7 ROCKS REFINED ${s.rocksRefined}`;
     };
     const mins = Math.floor(world.time / 60);
     const secs = Math.floor(world.time % 60).toString().padStart(2, '0');
@@ -333,11 +434,7 @@ export class Game {
       subtitle: single ? `LEVEL ${this.playingLevel}` : 'LOCAL VERSUS',
       items: [single && won ? 'NEXT LEVEL' : 'RETRY', 'MAIN MENU'],
       selected: 0,
-      lines: [
-        statLine(0, single ? 'YOU ' : 'BLUE'),
-        statLine(1, single ? 'AI  ' : 'RED '),
-        `WAVES ${world.waveNumber} \u00B7 TIME ${mins}:${secs}`,
-      ],
+      lines: [statLine(0), statLine(1), `TOTAL LAUNCHES ${world.waveNumber} \u00B7 TIME ${mins}:${secs}`],
     });
   }
 
@@ -348,11 +445,11 @@ export class Game {
     const screen = this.view.screen;
     const count = menu.items.length;
 
-    if (screen === 'paused' && input.wasAnyPressed(['Escape', 'KeyP'])) {
+    if (screen === 'paused' && input.wasAnyPressed(PAUSE_CODES)) {
       this.resume();
       return;
     }
-    if (screen === 'howto' && input.wasPressed('Escape')) {
+    if (screen === 'howto' && input.wasAnyPressed(PAUSE_CODES)) {
       this.audio.play('menuSelect');
       this.openMainMenu(2);
       return;

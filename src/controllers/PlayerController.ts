@@ -1,68 +1,19 @@
-import type { Team, World } from '../types';
+import type { BuildAction, Team, World } from '../types';
 import type { Input } from '../core/Input';
-import { COLS, CURSOR_REPEAT, DRONE_LERP, HUD_TOP, MAP_H, MAP_W, PICKUP_RADIUS, ROWS, TILE } from '../core/config';
-import { SLOT_ACTIONS } from '../data/units';
-import { TOWER_KINDS } from '../data/towers';
+import type { KeyBindings } from '../data/controls';
+import { COLS, CURSOR_REPEAT, DRONE_LERP, MAP_H, MAP_W, MAP_X, MAP_Y, PICKUP_RADIUS, ROWS, TILE } from '../core/config';
 import { getTowerAt, tryBuild, trySell, tryUpgrade } from '../systems/BuildSystem';
-import { dropRock, findRockNear, tryPickUpRock } from '../systems/EconomySystem';
-import { queueUnit } from '../systems/WaveSystem';
-import { hitTestBuildMenu } from '../ui/BuildMenu';
-
-export interface KeyBindings {
-  up: readonly string[];
-  down: readonly string[];
-  left: readonly string[];
-  right: readonly string[];
-  action: readonly string[];
-  /** 7 slots (see SLOT_ACTIONS); each accepts any of its codes. */
-  slots: readonly (readonly string[])[];
-  upgrade: readonly string[];
-  sell: readonly string[];
-  prevTower: readonly string[];
-  nextTower: readonly string[];
-}
-
-export const P1_BINDINGS: KeyBindings = {
-  up: ['KeyW'],
-  down: ['KeyS'],
-  left: ['KeyA'],
-  right: ['KeyD'],
-  action: ['Space'],
-  slots: [['Digit1'], ['Digit2'], ['Digit3'], ['Digit4'], ['Digit5'], ['Digit6'], ['Digit7']],
-  upgrade: ['KeyR'],
-  sell: ['KeyF'],
-  prevTower: ['KeyQ'],
-  nextTower: ['KeyE'],
-};
-
-export const P2_BINDINGS: KeyBindings = {
-  up: ['ArrowUp'],
-  down: ['ArrowDown'],
-  left: ['ArrowLeft'],
-  right: ['ArrowRight'],
-  action: ['Enter', 'NumpadEnter'],
-  slots: [
-    ['Numpad1', 'KeyU'],
-    ['Numpad2', 'KeyI'],
-    ['Numpad3', 'KeyO'],
-    ['Numpad4', 'KeyP'],
-    ['Numpad5', 'KeyJ'],
-    ['Numpad6', 'KeyK'],
-    ['Numpad7', 'KeyL'],
-  ],
-  upgrade: ['NumpadAdd', 'BracketLeft'],
-  sell: ['NumpadSubtract', 'BracketRight'],
-  prevTower: [],
-  nextTower: [],
-};
+import { dropRock, findRockNear, tryPickUpRock, tryResearch } from '../systems/EconomySystem';
+import { launchWave, queueUnit } from '../systems/WaveSystem';
+import { hitTestSidebar } from '../ui/Sidebar';
 
 /** Delay before keyboard auto-repeat kicks in (seconds). */
 const REPEAT_DELAY = 0.22;
 const FAIL_FLASH = 0.3;
 
-/** Human player: keyboard cursor (and optional mouse) driving the collector drone. */
+/** Human player: keyboard cursor (and optional mouse) driving the collector ship. */
 export class PlayerController {
-  /** True while the drone follows the mouse pointer instead of the cell center. */
+  /** True while the ship follows the mouse pointer instead of the cell center. */
   private mouseActive = false;
 
   constructor(
@@ -72,30 +23,50 @@ export class PlayerController {
   ) {}
 
   update(world: World, input: Input, dt: number): void {
-    const player = world.players[this.team];
-    const cursor = player.cursor;
+    const cursor = world.players[this.team].cursor;
     const b = this.bindings;
 
     this.updateKeyboardMovement(world, input, dt);
     if (this.useMouse) this.updateMouse(world, input);
 
     for (let i = 0; i < b.slots.length; i++) {
-      const codes = b.slots[i];
-      if (codes && input.wasAnyPressed(codes)) this.useSlot(world, i);
+      const slot = b.slots[i];
+      if (slot && input.wasAnyPressed(slot.codes)) this.perform(world, slot.action);
     }
+    if (input.wasAnyPressed(b.act)) this.doAction(world);
 
-    if (b.prevTower.length > 0 && input.wasAnyPressed(b.prevTower)) this.cycleTower(world, -1);
-    if (b.nextTower.length > 0 && input.wasAnyPressed(b.nextTower)) this.cycleTower(world, 1);
-
-    if (input.wasAnyPressed(b.action)) this.doAction(world);
-    if (input.wasAnyPressed(b.upgrade)) this.fail(world, !tryUpgrade(world, this.team, cursor.col, cursor.row));
-    if (input.wasAnyPressed(b.sell)) this.fail(world, !trySell(world, this.team, cursor.col, cursor.row));
-
-    const tx = this.mouseActive ? clamp(input.mouse.x, 0, MAP_W - 1) : (cursor.col + 0.5) * TILE;
-    const ty = this.mouseActive ? clamp(input.mouse.y - HUD_TOP, 0, MAP_H - 1) : (cursor.row + 0.5) * TILE;
+    const m = input.mouse;
+    const tx = this.mouseActive ? clamp(m.x - MAP_X, 0, MAP_W - 1) : (cursor.col + 0.5) * TILE;
+    const ty = this.mouseActive ? clamp(m.y - MAP_Y, 0, MAP_H - 1) : (cursor.row + 0.5) * TILE;
     const k = 1 - Math.exp(-DRONE_LERP * dt);
     cursor.x += (tx - cursor.x) * k;
     cursor.y += (ty - cursor.y) * k;
+  }
+
+  /** Executes one sidebar/hotkey action for this team. */
+  perform(world: World, action: BuildAction): void {
+    const team = this.team;
+    const cursor = world.players[team].cursor;
+    switch (action.type) {
+      case 'build':
+        world.players[team].selectedTower = action.kind;
+        break;
+      case 'send':
+        this.fail(world, !queueUnit(world, team, action.kind));
+        break;
+      case 'launch':
+        this.fail(world, !launchWave(world, team));
+        break;
+      case 'upgrade':
+        this.fail(world, !tryUpgrade(world, team, cursor.col, cursor.row));
+        break;
+      case 'sell':
+        this.fail(world, !trySell(world, team, cursor.col, cursor.row));
+        break;
+      case 'research':
+        this.fail(world, !tryResearch(world, team, action.kind));
+        break;
+    }
   }
 
   private updateKeyboardMovement(world: World, input: Input, dt: number): void {
@@ -143,12 +114,13 @@ export class PlayerController {
   private updateMouse(world: World, input: Input): void {
     const m = input.mouse;
     const cursor = world.players[this.team].cursor;
-    const mapY = m.y - HUD_TOP;
-    const overMap = m.inside && m.x >= 0 && m.x < MAP_W && mapY >= 0 && mapY < MAP_H;
+    const mx = m.x - MAP_X;
+    const my = m.y - MAP_Y;
+    const overMap = m.inside && mx >= 0 && mx < MAP_W && my >= 0 && my < MAP_H;
 
     if (overMap && (m.moved || m.leftPressed || m.rightPressed)) {
-      cursor.col = clamp(Math.floor(m.x / TILE), 0, COLS - 1);
-      cursor.row = clamp(Math.floor(mapY / TILE), 0, ROWS - 1);
+      cursor.col = clamp(Math.floor(mx / TILE), 0, COLS - 1);
+      cursor.row = clamp(Math.floor(my / TILE), 0, ROWS - 1);
       this.mouseActive = true;
     } else if (!overMap && m.moved) {
       this.mouseActive = false;
@@ -156,32 +128,21 @@ export class PlayerController {
 
     if (m.leftPressed) {
       if (overMap) {
-        // Snap the drone to the pointer so pickups/drops happen exactly where clicked.
-        cursor.x = m.x;
-        cursor.y = mapY;
+        // Snap the ship to the pointer so pickups/drops happen exactly where clicked.
+        cursor.x = mx;
+        cursor.y = my;
         this.doAction(world);
       } else {
-        const hit = hitTestBuildMenu(m.x, m.y, world.mode);
-        if (hit && hit.team === this.team) this.useSlot(world, hit.slot);
+        const action = hitTestSidebar(m.x, m.y, world.mode);
+        if (action) this.perform(world, action);
       }
     }
 
-    if (m.rightPressed && cursor.carryingRockId !== null) dropRock(world, this.team);
-  }
-
-  private useSlot(world: World, slot: number): void {
-    const action = SLOT_ACTIONS[slot];
-    if (!action) return;
-    if (action.type === 'build') world.players[this.team].selectedTower = action.kind;
-    else this.fail(world, !queueUnit(world, this.team, action.kind));
-  }
-
-  private cycleTower(world: World, dir: number): void {
-    const player = world.players[this.team];
-    const idx = TOWER_KINDS.indexOf(player.selectedTower);
-    const n = TOWER_KINDS.length;
-    const next = TOWER_KINDS[(idx + dir + n) % n];
-    if (next) player.selectedTower = next;
+    if (m.rightPressed && overMap) {
+      const tower = getTowerAt(world, cursor.col, cursor.row);
+      if (tower && tower.team === this.team) this.fail(world, !trySell(world, this.team, cursor.col, cursor.row));
+      else if (cursor.carryingRockId !== null) dropRock(world, this.team);
+    }
   }
 
   private doAction(world: World): void {

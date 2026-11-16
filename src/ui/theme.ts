@@ -59,6 +59,16 @@ export function polygonPath(ctx: CanvasRenderingContext2D, x: number, y: number,
   ctx.closePath();
 }
 
+/** Linear mix of two '#rrggbb' colors. */
+export function mixHex(a: string, b: string, t: number): string {
+  const na = parseInt(a.slice(1), 16);
+  const nb = parseInt(b.slice(1), 16);
+  const r = Math.round(((na >> 16) & 255) * (1 - t) + ((nb >> 16) & 255) * t);
+  const g = Math.round(((na >> 8) & 255) * (1 - t) + ((nb >> 8) & 255) * t);
+  const bl = Math.round((na & 255) * (1 - t) + (nb & 255) * t);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
+}
+
 /** '#rrggbb' + alpha -> 'rgba(...)'. Non-hex inputs are returned unchanged. */
 export function rgba(hex: string, a: number): string {
   if (hex.length !== 7 || hex[0] !== '#') return hex;

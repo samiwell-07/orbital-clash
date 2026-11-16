@@ -17,13 +17,14 @@ function chebyshevToBase(col: number, row: number): number {
   return best;
 }
 
-/** Cells where natural rock may never be placed (base surroundings, spawn lanes). */
+/**
+ * Cells where natural rock may never be placed: anything within 3 cells of a base (Chebyshev),
+ * the columns next to the bases, and the spawn approach lanes in front of each portal.
+ */
 function rockForbidden(col: number, row: number): boolean {
-  if (chebyshevToBase(col, row) <= 2) return true;
-  if (row >= 6 && row <= 11 && ((col >= 2 && col <= 4) || (col >= COLS - 5 && col <= COLS - 3))) return true;
-  for (let t = 0; t < 2; t++) {
-    for (const s of getSpawnCells(t as Team)) if (s.col === col && s.row === row) return true;
-  }
+  if (chebyshevToBase(col, row) <= 3) return true;
+  if (col < BASE_W + 3 || col > COLS - BASE_W - 4) return true;
+  if (row >= BASE_ROW - 2 && row <= BASE_ROW + BASE_H + 1 && (col <= BASE_W + 5 || col >= COLS - BASE_W - 6)) return true;
   return false;
 }
 
@@ -55,9 +56,61 @@ function buildShade(seed: number, cells: Cell[]): void {
   }
 }
 
+const DC4 = [1, -1, 0, 0];
+const DR4 = [0, 0, 1, -1];
+
+/** True if (col,row) or any of its 8 neighbours is rock (keeps formations separated by at least one cell). */
+function touchesRock(cells: Cell[], col: number, row: number): boolean {
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const c = col + dc;
+      const r = row + dr;
+      if (c < 0 || r < 0 || c >= COLS || r >= ROWS) continue;
+      if (cells[r * COLS + c]!.type === 'rock') return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Grows an organic blob of `size` cells from (sc,sr) inside [minC,maxC] x [1,ROWS-2].
+ * Returns null if it could not reach `minSize`.
+ */
+function growBlob(
+  rng: () => number,
+  cells: Cell[],
+  sc: number,
+  sr: number,
+  size: number,
+  minSize: number,
+  minC: number,
+  maxC: number,
+): GridPos[] | null {
+  if (rockForbidden(sc, sr) || touchesRock(cells, sc, sr)) return null;
+  const blob: GridPos[] = [{ col: sc, row: sr }];
+  for (let tries = 0; tries < 60 && blob.length < size; tries++) {
+    // Bias growth toward the most recent cells for a lumpy, organic shape.
+    const from = blob[Math.max(0, blob.length - 1 - Math.floor(rng() * rng() * blob.length))]!;
+    const d = Math.floor(rng() * 4);
+    const nc = from.col + DC4[d]!;
+    const nr = from.row + DR4[d]!;
+    if (nc < minC || nc > maxC || nr < 1 || nr > ROWS - 2) continue;
+    if (rockForbidden(nc, nr) || touchesRock(cells, nc, nr)) continue;
+    if (blob.some((p) => p.col === nc && p.row === nr)) continue;
+    blob.push({ col: nc, row: nr });
+  }
+  return blob.length >= minSize ? blob : null;
+}
+
+function placeRock(cells: Cell[], col: number, row: number, obstacleId: number): void {
+  const cell = cells[row * COLS + col]!;
+  cell.type = 'rock';
+  cell.obstacleId = obstacleId;
+}
+
 function generate(seed: number): GridData {
   const cells: Cell[] = [];
-  for (let i = 0; i < COLS * ROWS; i++) cells.push({ type: 'empty', towerId: null, baseTeam: null, shade: 0 });
+  for (let i = 0; i < COLS * ROWS; i++) cells.push({ type: 'empty', towerId: null, baseTeam: null, shade: 0, obstacleId: -1 });
   const grid: GridData = { cols: COLS, rows: ROWS, cells, version: 0 };
 
   for (let t = 0; t < 2; t++) {
@@ -73,31 +126,37 @@ function generate(seed: number): GridData {
 
   const rng = createRng(seed);
   const half = COLS / 2;
-  // Each left-half cluster is mirrored, giving 6-8 clusters total.
-  const pairs = randInt(rng, 3, 4);
-  let placedPairs = 0;
-  for (let attempt = 0; attempt < 60 && placedPairs < pairs; attempt++) {
-    const sc = randInt(rng, 3, half - 1);
-    const sr = randInt(rng, 0, ROWS - 1);
-    if (rockForbidden(sc, sr) || cells[sr * COLS + sc]!.type !== 'empty') continue;
-    const size = randInt(rng, 1, 4);
-    const cluster: GridPos[] = [{ col: sc, row: sr }];
-    for (let tries = 0; tries < 12 && cluster.length < size; tries++) {
-      const base = cluster[Math.floor(rng() * cluster.length)]!;
-      const dir = Math.floor(rng() * 4);
-      const nc = base.col + (dir === 0 ? 1 : dir === 1 ? -1 : 0);
-      const nr = base.row + (dir === 2 ? 1 : dir === 3 ? -1 : 0);
-      if (nc < 0 || nc >= half || nr < 0 || nr >= ROWS) continue;
-      if (rockForbidden(nc, nr)) continue;
-      if (cluster.some((p) => p.col === nc && p.row === nr)) continue;
-      if (cells[nr * COLS + nc]!.type !== 'empty') continue;
-      cluster.push({ col: nc, row: nr });
+  let nextObstacle = 0;
+  // 2-4 formations total: 1 or 2 mirrored pairs, plus optionally one self-symmetric centre crater (never 5).
+  const pairs = randInt(rng, 1, 2);
+  const wantCenter = pairs === 1 ? rng() < 0.75 : false;
+
+  if (wantCenter) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      // Left half of the centre crater (cols half-2..half-1); mirroring gives 4-8 cells straddling the centre line.
+      const blob = growBlob(rng, cells, half - 1, randInt(rng, 3, ROWS - 4), randInt(rng, 2, 4), 2, half - 2, half - 1);
+      if (!blob) continue;
+      const id = nextObstacle++;
+      for (const p of blob) {
+        placeRock(cells, p.col, p.row, id);
+        placeRock(cells, COLS - 1 - p.col, p.row, id);
+      }
+      break;
     }
-    for (const p of cluster) {
-      cells[p.row * COLS + p.col]!.type = 'rock';
-      cells[p.row * COLS + (COLS - 1 - p.col)]!.type = 'rock';
+  }
+
+  let placed = 0;
+  for (let attempt = 0; attempt < 80 && placed < pairs; attempt++) {
+    // Keep pair blobs off the centre line so the mirror copy stays a separate formation.
+    const blob = growBlob(rng, cells, randInt(rng, 5, half - 3), randInt(rng, 1, ROWS - 2), randInt(rng, 4, 9), 4, 4, half - 3);
+    if (!blob) continue;
+    const id = nextObstacle;
+    nextObstacle += 2;
+    for (const p of blob) {
+      placeRock(cells, p.col, p.row, id);
+      placeRock(cells, COLS - 1 - p.col, p.row, id + 1);
     }
-    placedPairs++;
+    placed++;
   }
 
   buildShade(seed, cells);
@@ -113,7 +172,7 @@ function allSpawnsConnected(grid: GridData): boolean {
   return true;
 }
 
-/** Builds the 32x18 grid: base cells for both teams + mirrored natural rock outcrops (deterministic from seed). */
+/** Builds the COLS x ROWS grid: base cells for both teams + 2-4 mirrored natural rock craters (deterministic from seed). */
 export function createGrid(seed: number): GridData {
   let s = seed >>> 0;
   for (let i = 0; i < MAX_GEN_ATTEMPTS; i++) {
@@ -123,7 +182,11 @@ export function createGrid(seed: number): GridData {
   }
   // Practically unreachable; fall back to a map without rocks.
   const grid = generate(s);
-  for (const cell of grid.cells) if (cell.type === 'rock') cell.type = 'empty';
+  for (const cell of grid.cells) {
+    if (cell.type !== 'rock') continue;
+    cell.type = 'empty';
+    cell.obstacleId = -1;
+  }
   return grid;
 }
 

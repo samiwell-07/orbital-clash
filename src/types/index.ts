@@ -1,9 +1,9 @@
 /**
- * Shared type contract for Orbital Clash.
+ * Shared type contract for Orbital Clash (v2: swarm trains, harvesters, research, sidebar HUD).
  * Every system operates on the plain-data `World` defined here.
  */
 
-/** 0 = Player 1 (left, cyan). 1 = Player 2 / AI (right, orange). */
+/** 0 = Player 1 (left, blue). 1 = Player 2 (purple) or AI (red), on the right. */
 export type Team = 0 | 1;
 
 export interface Vec2 {
@@ -25,7 +25,7 @@ export interface Rect {
 
 // ---------------------------------------------------------------- Grid
 
-/** 'rock' = natural impassable outcrop. 'base' = part of a team base. */
+/** 'rock' = natural impassable obstacle/crater. 'base' = part of a team base. */
 export type CellType = 'empty' | 'rock' | 'base';
 
 export interface Cell {
@@ -36,6 +36,8 @@ export interface Cell {
   baseTeam: Team | null;
   /** Cosmetic 0..1 noise value for terrain shading. */
   shade: number;
+  /** Id of the obstacle formation this rock cell belongs to (for rendering whole craters), else -1. */
+  obstacleId: number;
 }
 
 export interface GridData {
@@ -47,12 +49,37 @@ export interface GridData {
   version: number;
 }
 
+/**
+ * Per-team BFS distance field (in steps) from every cell to the TARGET base of that team's units.
+ * `dist[team][i]` = steps for a unit of `team` from cell i to reach base of otherTeam(team); -1 = unreachable.
+ */
+export interface FlowFields {
+  version: number;
+  dist: [Int32Array, Int32Array];
+}
+
+/** Bucketed spatial index of live units (rebuilt every sim step). See systems/Spatial.ts. */
+export interface SpatialIndex {
+  cellSize: number;
+  cols: number;
+  rows: number;
+  /** head[cell] = index into `items` of first unit in that bucket, -1 if empty. */
+  head: Int32Array;
+  /** next[i] = index of next unit in same bucket, -1 terminates. */
+  next: Int32Array;
+  items: Unit[];
+  count: number;
+}
+
 // ---------------------------------------------------------------- Definitions (static data)
 
-export type TowerKind = 'laser' | 'cannon' | 'cryo' | 'refinery';
-export type UnitKind = 'scout' | 'tank' | 'shielded';
+/** laser = red laser, cannon = fireball mortar, cryo = blue frost wave, plasma = yellow/white plasma stream, refinery = Harvest Station. */
+export type TowerKind = 'laser' | 'cannon' | 'cryo' | 'plasma' | 'refinery';
+/** scout = Swarmer, tank = Juggernaut, shielded = Aegis (hybrid), bomber = air unit. */
+export type UnitKind = 'scout' | 'tank' | 'shielded' | 'bomber';
+export type ResearchKind = 'maxLevel3' | 'swarmSpeed' | 'doubleHarvest';
 
-/** Stats for one upgrade level of a tower. Distances are in TILES, times in SECONDS. */
+/** Stats for one upgrade level of a tower. Distances in TILES, times in SECONDS. */
 export interface TowerLevelStats {
   /** Cost to build (level 0) or to upgrade INTO this level (levels 1, 2). */
   cost: number;
@@ -64,21 +91,25 @@ export interface TowerLevelStats {
   slowFactor: number;
   slowDuration: number;
   projectileSpeed: number;
-  /** Refinery only: radius in tiles within which rocks are pulled in. */
+  /** Refinery only: radius in tiles within which landed rocks are pulled in. */
   magnetRadius: number;
   /** Refinery only: pull speed in tiles/second. */
   magnetStrength: number;
-  /** Refinery only: seconds to refine one rock into money. */
+  /** Refinery only: seconds to refine one rock. */
   refineTime: number;
   /** Refinery only: multiplier on rock value. */
   valueMultiplier: number;
+  /** Refinery only: number of harvester drones this station operates. */
+  harvesters: number;
 }
 
 export interface TowerDef {
   kind: TowerKind;
   name: string;
   description: string;
-  /** Exactly 3 levels (index 0..2). */
+  hitsGround: boolean;
+  hitsAir: boolean;
+  /** Exactly 3 levels (index 0..2). Level index 2 requires research 'maxLevel3'. */
   levels: [TowerLevelStats, TowerLevelStats, TowerLevelStats];
 }
 
@@ -86,46 +117,58 @@ export interface UnitDef {
   kind: UnitKind;
   name: string;
   description: string;
-  cost: number;
+  /** Units are bought in squads: `packCost` buys `packSize` units into the wave buffer. */
+  packCost: number;
+  packSize: number;
   maxHp: number;
   maxShield: number;
-  /** Shield points regenerated per second (after shieldRegenDelay without damage). */
   shieldRegen: number;
   shieldRegenDelay: number;
-  /** Multiplier on LASER damage dealt to shield points (0.5 = lasers half as effective). */
+  /** Multiplier on LASER/PLASMA damage dealt to shield points. */
   shieldLaserMult: number;
   /** Tiles per second. */
   speed: number;
-  /** Damage dealt to the enemy base on arrival. */
+  /** Air units fly straight over the maze; only towers with hitsAir can target them. */
+  air: boolean;
   baseDamage: number;
-  /** Money awarded to the team that kills it. */
+  /** Money for the team that kills ONE unit. */
   bounty: number;
-  /** Collision/render radius in PIXELS. */
+  /** Render/collision radius in PIXELS. */
   radius: number;
 }
 
+export interface ResearchDef {
+  kind: ResearchKind;
+  name: string;
+  description: string;
+  /** Cost in research energy (cyan bar). */
+  cost: number;
+}
+
+/** Sidebar/hotkey slots. */
 export type BuildAction =
   | { type: 'build'; kind: TowerKind }
-  | { type: 'send'; kind: UnitKind };
+  | { type: 'send'; kind: UnitKind }
+  | { type: 'research'; kind: ResearchKind }
+  | { type: 'launch' }
+  | { type: 'upgrade' }
+  | { type: 'sell' };
 
-/** AI / world tuning for a given single-player level (1-based, unbounded). */
+/** World/AI tuning. Single player levels are 1-based and unbounded; versus uses level 0. */
 export interface LevelDef {
   level: number;
-  /** Starting money for team 1 (AI or P2). */
   aiStartMoney: number;
-  /** Multiplier for AI passive wave income. */
   aiIncomeMult: number;
-  /** Seconds between AI decisions. */
   aiThinkInterval: number;
-  /** HP multiplier for units sent by the AI. */
   aiUnitHpMult: number;
-  /** AI drone speed in tiles/second. */
   aiDroneSpeed: number;
   /** Fraction of AI money spent on offense (0..1). */
   aiAggression: number;
+  /** AI launches its buffer when it holds at least this many units. */
+  aiLaunchSize: number;
   meteorInterval: number;
+  /** Rocks per shower cluster [min, max]. */
   rocksPerShower: [number, number];
-  waveInterval: number;
 }
 
 // ---------------------------------------------------------------- Entities (runtime)
@@ -142,16 +185,14 @@ export interface Tower {
   y: number;
   cooldown: number;
   targetId: number | null;
-  /** Turret angle in radians (render). */
+  /** Turret angle in radians. */
   angle: number;
-  /** Money invested (build + upgrades) – used for sell refund. */
+  /** Money invested (build + upgrades), for sell refund. */
   totalSpent: number;
-  /** Refinery: rock ids currently queued for refining. */
+  /** Refinery: rock ids queued for refining. */
   refineQueue: number[];
   refineProgress: number;
-  /** Visual flash timer (seconds) after firing / refining. */
   flash: number;
-  /** Visual build-in animation 0..1. */
   buildAnim: number;
 }
 
@@ -159,31 +200,31 @@ export interface Unit {
   id: number;
   team: Team;
   kind: UnitKind;
+  air: boolean;
   x: number;
   y: number;
   hp: number;
   maxHp: number;
   shield: number;
   maxShield: number;
-  /** Seconds since last damage (for shield regen). */
   sinceDamage: number;
-  /** Base speed in tiles/second. */
+  /** Base speed in tiles/second (swarmSpeed research already applied at spawn). */
   speed: number;
-  /** Current path in cells (path[pathIndex] = next waypoint). */
-  path: GridPos[];
-  pathIndex: number;
-  /** grid.version the path was computed for. */
-  pathVersion: number;
+  /** Next waypoint cell (ground units follow FlowFields cell to cell). */
+  nextCol: number;
+  nextRow: number;
   slowTimer: number;
   slowFactor: number;
   alive: boolean;
   angle: number;
   hitFlash: number;
-  /** Seconds alive (for render bobbing). */
   age: number;
+  /** Index of this unit inside its launched train (0 = head). For rendering serpent segments. */
+  trainIndex: number;
 }
 
-export type ProjectileKind = 'missile' | 'cryo';
+/** missile = cannon fireball. */
+export type ProjectileKind = 'missile';
 
 export interface Projectile {
   id: number;
@@ -191,14 +232,11 @@ export interface Projectile {
   kind: ProjectileKind;
   x: number;
   y: number;
-  /** Target position (updated while target alive). */
   tx: number;
   ty: number;
   targetId: number | null;
-  /** Pixels per second. */
   speed: number;
   damage: number;
-  /** Pixels. */
   splashRadius: number;
   slowFactor: number;
   slowDuration: number;
@@ -207,20 +245,21 @@ export interface Projectile {
   trailTimer: number;
 }
 
-/** Instant laser beam visual. */
+export type BeamStyle = 'laser' | 'plasma';
+
 export interface Beam {
   x1: number;
   y1: number;
   x2: number;
   y2: number;
   team: Team;
+  style: BeamStyle;
   color: string;
   width: number;
   life: number;
   maxLife: number;
 }
 
-/** Expanding ring visual (cryo pulse, explosion shockwave, build ping). */
 export interface Ring {
   x: number;
   y: number;
@@ -233,27 +272,46 @@ export interface Ring {
 
 export type RockState = 'falling' | 'landed' | 'carried' | 'magnet' | 'refining';
 
+/** One Thorium crystal cluster sitting on (or falling to) a tile. */
 export interface ThoriumRock {
   id: number;
   x: number;
   y: number;
-  /** Landing target (falling) – pixel coordinates. */
   targetX: number;
   targetY: number;
-  /** Fall start position (for trail interpolation). */
   startX: number;
   startY: number;
   state: RockState;
   value: number;
   fallTimer: number;
   fallDuration: number;
-  /** Team whose drone is carrying it (state 'carried'). */
+  /** Team whose ship (cursor) carries it. */
   carriedBy: Team | null;
-  /** Refinery tower id pulling / refining it (state 'magnet' | 'refining'). */
+  /** Harvester id carrying it (state 'carried'), else null. */
+  harvesterId: number | null;
+  /** Refinery tower id pulling / refining it. */
   magnetTowerId: number | null;
-  /** Random phase for glow pulsing. */
+  /** Harvester id that has reserved it as a mining target. */
+  reservedBy: number | null;
   pulse: number;
   size: number;
+  alive: boolean;
+}
+
+export type HarvesterState = 'idle' | 'toRock' | 'returning';
+
+/** Automated mining drone owned by a Harvest Station (refinery). Flies; never blocks or is targeted. */
+export interface Harvester {
+  id: number;
+  team: Team;
+  stationId: number;
+  x: number;
+  y: number;
+  state: HarvesterState;
+  targetRockId: number | null;
+  /** Rock ids currently carried. Capacity 1, or 2 with 'doubleHarvest'. */
+  cargo: number[];
+  angle: number;
   alive: boolean;
 }
 
@@ -267,7 +325,6 @@ export interface Particle {
   maxLife: number;
   size: number;
   color: string;
-  /** Velocity multiplier per second (e.g. 0.1 = strong drag). */
   drag: number;
 }
 
@@ -283,13 +340,10 @@ export interface FloatingText {
 
 export interface Base {
   team: Team;
-  /** Top-left cell. */
   col: number;
   row: number;
-  /** Size in cells. */
   w: number;
   h: number;
-  /** Pixel center. */
   x: number;
   y: number;
   hp: number;
@@ -297,16 +351,14 @@ export interface Base {
   hitFlash: number;
 }
 
+/** The player's ship: grid cursor + flying collector that can carry one rock. */
 export interface CursorState {
   col: number;
   row: number;
-  /** Smoothed pixel position of the drone (map space) for rendering & carrying. */
   x: number;
   y: number;
   carryingRockId: number | null;
-  /** Red flash timer after an invalid action. */
   failFlash: number;
-  /** Key auto-repeat timer for keyboard movement. */
   moveRepeat: number;
 }
 
@@ -317,29 +369,35 @@ export interface PlayerStats {
   rocksRefined: number;
   unitsSent: number;
   moneyEarned: number;
+  launches: number;
 }
 
 export interface PlayerState {
   team: Team;
   controller: ControllerKind;
+  /** Palette key: 'blue' (P1), 'purple' (P2 versus), 'red' (AI). */
+  palette: PaletteKey;
   money: number;
+  /** Research energy (cyan bar). */
+  research: number;
+  researched: Record<ResearchKind, boolean>;
   selectedTower: TowerKind;
   cursor: CursorState;
-  /** Units bought, launched at next wave. */
+  /** Wave buffer: units bought, all launched together as one train. */
   queue: UnitKind[];
-  /** Cells adjacent to this team's base where its units spawn. */
   spawnCells: GridPos[];
-  /** HP multiplier for this team's units. */
   unitHpMult: number;
-  /** Multiplier for passive wave income. */
   incomeMult: number;
   stats: PlayerStats;
 }
+
+export type PaletteKey = 'blue' | 'purple' | 'red';
 
 export interface PendingSpawn {
   team: Team;
   kind: UnitKind;
   delay: number;
+  trainIndex: number;
 }
 
 // ---------------------------------------------------------------- Events
@@ -358,9 +416,10 @@ export type GameEvent =
   | { type: 'rockPickup'; team: Team }
   | { type: 'rockDrop'; team: Team }
   | { type: 'rockRefined'; team: Team; value: number; x: number; y: number }
-  | { type: 'unitQueued'; team: Team; kind: UnitKind }
+  | { type: 'unitQueued'; team: Team; kind: UnitKind; count: number }
   | { type: 'notEnoughMoney'; team: Team }
-  | { type: 'waveLaunched'; wave: number; counts: [number, number] }
+  | { type: 'research'; team: Team; kind: ResearchKind }
+  | { type: 'waveLaunched'; team: Team; count: number }
   | { type: 'gameOver'; winner: Team };
 
 export type GameEventType = GameEvent['type'];
@@ -373,32 +432,29 @@ export interface World {
   mode: GameMode;
   level: LevelDef;
   grid: GridData;
+  flow: FlowFields;
+  spatial: SpatialIndex;
   bases: [Base, Base];
   players: [PlayerState, PlayerState];
   towers: Tower[];
   units: Unit[];
+  harvesters: Harvester[];
   projectiles: Projectile[];
   beams: Beam[];
   rings: Ring[];
   rocks: ThoriumRock[];
-  /** Fixed-size pool; reuse inactive slots. */
   particles: Particle[];
   texts: FloatingText[];
   pendingSpawns: PendingSpawn[];
-  /** Events emitted this frame; drained by Game (audio/UI) each frame. */
   events: GameEvent[];
-  /** Total simulated seconds. */
+  /** Match time in seconds (counts up; shown as 00:00 in the sidebar). */
   time: number;
-  /** Seconds until the next wave launches. */
-  waveTimer: number;
+  /** Total launches by both teams. */
   waveNumber: number;
-  /** Seconds until the next meteor shower. */
   meteorTimer: number;
-  /** Screen-shake intensity in pixels (decays). */
   shake: number;
   winner: Team | null;
   nextId: number;
-  /** Deterministic RNG for gameplay: returns [0,1). */
   rng: () => number;
 }
 
@@ -411,22 +467,16 @@ export interface MenuView {
   subtitle: string;
   items: string[];
   selected: number;
-  /** Extra lines (e.g. game-over stats). */
   lines: string[];
 }
 
-/** Everything the renderer needs beyond the World. */
 export interface ViewState {
   screen: ScreenState;
-  /** Menu overlay (menu/paused/gameover/howto screens), null while playing. */
   menu: MenuView | null;
   fps: number;
-  /** Real (unscaled) seconds since start, for UI animation. */
   realTime: number;
-  /** Single-player level being played or highest unlocked (menu). */
   level: number;
   muted: boolean;
-  /** Short banner message (e.g. "WAVE 3 LAUNCHED"), with remaining time. */
   banner: { text: string; color: string; time: number } | null;
 }
 
@@ -434,6 +484,7 @@ export type SfxName =
   | 'laser'
   | 'cannon'
   | 'cryo'
+  | 'plasma'
   | 'explosion'
   | 'bigExplosion'
   | 'build'
@@ -447,6 +498,7 @@ export type SfxName =
   | 'baseHit'
   | 'wave'
   | 'queue'
+  | 'research'
   | 'menuMove'
   | 'menuSelect'
   | 'victory'

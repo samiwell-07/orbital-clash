@@ -1,4 +1,4 @@
-import type { CometId, PlayerId, StructureKind, UnitKind, Difficulty, Profile } from './ids';
+import type { CometId, PaletteId, PlayerId, StructureKind, UnitKind, Difficulty, Profile } from './ids';
 
 /** Authored map: terrain mask plus pre-placed rocks, base slots and enemy layout. */
 export interface MapDef {
@@ -14,7 +14,7 @@ export interface MapDef {
   thoriumLevel: 1 | 2 | 3;
   /** Initial drifting rock count and spawn edge hints. */
   rockCount: number;
-  palette: CometId;
+  palette: PaletteId;
 }
 
 export interface PrePlacedStructure {

@@ -36,6 +36,8 @@ export type TargetMask = 'ground' | 'air' | 'both';
 
 export type Difficulty = 'beginner' | 'casual' | 'normal' | 'expert';
 export type CometId = 'kreios' | 'hathor' | 'aether' | 'helios';
+/** Visual palette of a map: the four base comets plus the Bionic Swarm worlds seen in screenshots. */
+export type PaletteId = CometId | 'gaia' | 'kronos';
 export type GameMode = 'campaign' | 'battle';
 /** Rules profile: original game vs Bionic Swarm expansion. */
 export type Profile = 'base' | 'bionic';

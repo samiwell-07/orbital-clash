@@ -1,5 +1,9 @@
 import './style.css';
 
-// Wired together by the integration step (see docs/ARCHITECTURE.md).
-const canvas = document.getElementById('game') as HTMLCanvasElement | null;
-if (canvas) canvas.dataset.booted = '1';
+import { createApp } from './app/createApp';
+
+const gl = document.getElementById('game') as HTMLCanvasElement;
+const hud = document.getElementById('hud') as HTMLCanvasElement;
+const app = createApp({ gl, hud });
+
+(window as unknown as { orbital: typeof app }).orbital = app;

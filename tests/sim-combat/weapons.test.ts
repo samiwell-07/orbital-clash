@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addRock, ensureFlow, flowDist, FLOW_INF, rebuild } from '@/sim/core';
-import { damageStructure, registerCombatSystems, splashUnits } from '@/sim/combat';
+import { damageStructure, fireMissiles, registerCombatSystems, siloLoaded, siloSystem, splashUnits } from '@/sim/combat';
+import { MISSILE_SILO } from '@/data';
 import { createPipeline } from '@/sim/core';
 import { arena, emitter, putStructure, putUnit, putWeapon, runCombat } from './helpers';
 
@@ -119,6 +120,46 @@ describe('structure destruction', () => {
     const events: string[] = [];
     expect(damageStructure(w, s, 10, 0, (e) => events.push(e.t))).toBe(false);
     expect(events).toEqual(['structureHit']);
+  });
+});
+
+describe('missile silo', () => {
+  const setupSilo = () => {
+    const w = arena();
+    Object.assign(w.players[1], { baseBuilt: true, baseTx: 10, baseTy: 4 });
+    const silo = putStructure(w, 'missileSilo', 0, 2, 4);
+    silo.buildProgress = 1;
+    return { w, silo };
+  };
+
+  it('fires from every loaded silo at the enemy base, then reloads', () => {
+    const { w, silo } = setupSilo();
+    const second = putStructure(w, 'missileSilo', 0, 2, 6);
+    second.buildProgress = 1;
+    expect(fireMissiles(w, 0, emitter(w))).toBe(2);
+    expect(w.projectiles.filter((p) => p.kind === 'missile')).toHaveLength(2);
+    expect(silo.cooldown).toBe(MISSILE_SILO.reloadSec);
+    expect(fireMissiles(w, 0, emitter(w))).toBe(0);
+    expect(w.events).toContainEqual({ t: 'denied', owner: 0, reason: 'Missile Silo reloading' });
+    runCombat(w, 240);
+    expect(w.players[1].hits).toBeGreaterThan(0);
+    siloSystem(w, MISSILE_SILO.reloadSec, emitter(w));
+    expect(siloLoaded(silo)).toBe(true);
+  });
+
+  it('denies without a silo, while building, or with no enemy base', () => {
+    const w = arena();
+    expect(fireMissiles(w, 0, emitter(w))).toBe(0);
+    const building = putStructure(w, 'missileSilo', 0, 2, 4);
+    expect(fireMissiles(w, 0, emitter(w))).toBe(0);
+    building.buildProgress = 1;
+    expect(fireMissiles(w, 0, emitter(w))).toBe(0);
+    expect(w.events.filter((e) => e.t === 'denied').map((e) => (e as { reason: string }).reason)).toEqual([
+      'Build a Missile Silo first',
+      'Missile Silo reloading',
+      'No enemy base to target',
+    ]);
+    expect(w.projectiles).toHaveLength(0);
   });
 });
 

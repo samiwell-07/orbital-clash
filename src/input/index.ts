@@ -6,3 +6,4 @@ export * from './menuNav';
 export * from './playerUi';
 export * from './playerIntents';
 export * from './createInput';
+export * from './devices';

@@ -1,4 +1,5 @@
 import type { Emit, Intent, PlayerId, Structure, StructureKind, World } from '@/types';
+import { MISSILE_SILO } from '@/data';
 import { addStructure, rebuildFlow } from '@/sim/core';
 import { spendThorium } from '@/sim/economy/thorium';
 import { canBuild, canBuildBase, friendlyUnitsOn } from './rules';
@@ -28,6 +29,7 @@ export function placeStructure(
   const p = w.players[player];
   const s = addStructure(w, {
     kind, owner: player, tx, ty, level: 0, hp: info.hp, maxHp: info.hp, buildProgress: 0,
+    cooldown: kind === 'missileSilo' ? MISSILE_SILO.reloadSec : 0,
     output: defaultOutput(p.tech, kind), scripted: p.controller === 'script',
   });
   p.stats.structuresBuilt++;

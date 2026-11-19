@@ -29,6 +29,8 @@ export interface Player {
   id: PlayerId;
   team: TeamId;
   controller: Controller;
+  /** Index into PLAYER_COLORS (lobby choice; defaults to the player id). */
+  colorIndex: number;
   alive: boolean;
   thorium: number;
   tech: Record<string, boolean>;

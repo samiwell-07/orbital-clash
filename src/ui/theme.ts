@@ -1,4 +1,4 @@
-import { PLAYER_COLORS } from '../types';
+import { ownerColor, paletteColor } from '../config/playerColors';
 
 export type Ctx = CanvasRenderingContext2D;
 
@@ -27,8 +27,14 @@ export function hex(n: number): string {
   return '#' + (n & 0xffffff).toString(16).padStart(6, '0');
 }
 
+/** CSS colour of an owner (player id), following the lobby colour choice. */
 export function playerColor(p: number): string {
-  return hex(PLAYER_COLORS[((p % 4) + 4) % 4]);
+  return hex(ownerColor(((p % 4) + 4) % 4));
+}
+
+/** CSS colour of a palette index (lobby swatches, team labels); not remapped by owner. */
+export function paletteCss(index: number): string {
+  return hex(paletteColor(index));
 }
 
 /** Accepts '#rrggbb'. */

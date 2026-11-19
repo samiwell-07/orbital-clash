@@ -49,7 +49,7 @@ export interface DirKeys {
 
 export interface KeySet {
   id: string;
-  /** `pick` keys drive the dpad (build menu) AND the right stick (attack unit). */
+  /** `pick` keys drive the dpad (build menu) AND the right stick (attack unit); they never move the ship. */
   move: DirKeys;
   pick: DirKeys;
   buttons: Partial<Record<PadButtonName, readonly string[]>>;
@@ -68,7 +68,8 @@ export const KEY_SETS: readonly KeySet[] = [
       R1: ['ShiftLeft', 'ShiftRight', 'Tab'],
       R3: ['Space', 'KeyV'],
       L1: ['BracketRight', 'BracketLeft'],
-      L2: ['KeyG'],
+      R2: ['KeyG'],
+      L2: ['KeyC'],
       START: ['Escape', 'KeyP'],
     },
   },
@@ -84,7 +85,8 @@ export const KEY_SETS: readonly KeySet[] = [
       R1: ['KeyN'],
       R3: ['KeyM'],
       L1: ['Comma', 'Period'],
-      L2: ['KeyB'],
+      R2: ['KeyB'],
+      L2: ['Semicolon'],
       START: ['Numpad0'],
     },
   },
@@ -93,20 +95,24 @@ export const KEY_SETS: readonly KeySet[] = [
 /** Extra menu-only keys (nav): any device. */
 export const NAV_KEYS = { confirm: ['Enter', 'NumpadEnter'], back: ['Backspace'] } as const;
 
-/** Human-readable table (docs/HUD help screens). */
-export const BINDING_ROWS: readonly { action: string; pad: string; p1: string; p2: string }[] = [
-  { action: 'Move ship', pad: 'Left stick', p1: 'W A S D', p2: 'I J K L' },
-  { action: 'Build menu (open/close)', pad: 'R1', p1: 'Shift / Tab', p2: 'N' },
-  { action: 'Pick build item', pad: 'D-pad', p1: 'Arrow keys', p2: 'Numpad 8 4 2 6' },
-  { action: 'Build on tile / confirm', pad: 'X (Cross)', p1: 'E', p2: 'U' },
-  { action: 'Hold on spawn tower: cycle output', pad: 'Hold X', p1: 'Hold E', p2: 'Hold U' },
-  { action: 'Upgrade tower (menus: back)', pad: 'O (Circle)', p1: 'Q', p2: 'O' },
-  { action: 'Recycle tower', pad: 'Square', p1: 'F', p2: 'Y' },
-  { action: 'Repair tower', pad: 'Triangle', p1: 'R', p2: 'H' },
-  { action: 'Attack menu (open/close)', pad: 'R3', p1: 'Space / V', p2: 'M' },
-  { action: 'Pick attack unit (hold 0.8 s = lock)', pad: 'Right stick', p1: 'Arrow keys', p2: 'Numpad 8 4 2 6' },
-  { action: 'Cycle target enemy (Battle)', pad: 'L1', p1: '] / [', p2: ', / .' },
-  { action: 'Grab rock (hold) / drop (release)', pad: 'L2 / R2', p1: 'G', p2: 'B' },
-  { action: 'Pause', pad: 'Start', p1: 'Esc / P', p2: 'Numpad 0' },
-  { action: 'Menu confirm / back (any device)', pad: 'X / O', p1: 'Enter / Backspace', p2: 'Enter / Backspace' },
+/**
+ * Human-readable table (docs/HUD help screens), matching the original game's controller screen.
+ * Browsers expose Xbox and PlayStation pads with the same standard layout, so both columns share one binding.
+ */
+export const BINDING_ROWS: readonly { action: string; xbox: string; ps: string; p1: string; p2: string }[] = [
+  { action: 'Move ship', xbox: 'Left stick / D-pad', ps: 'Left stick / D-pad', p1: 'W A S D', p2: 'I J K L' },
+  { action: 'Build menu (open/close)', xbox: 'RB', ps: 'R1', p1: 'Shift / Tab', p2: 'N' },
+  { action: 'Pick build item (build menu open)', xbox: 'D-pad', ps: 'D-pad', p1: 'Arrow keys', p2: 'Numpad 8 4 2 6' },
+  { action: 'Build / modify, confirm', xbox: 'A', ps: 'Cross', p1: 'E', p2: 'U' },
+  { action: 'Hold on spawn tower: cycle output', xbox: 'Hold A', ps: 'Hold Cross', p1: 'Hold E', p2: 'Hold U' },
+  { action: 'Upgrade tower (build menu: close)', xbox: 'B', ps: 'Circle', p1: 'Q', p2: 'O' },
+  { action: 'Recycle tower', xbox: 'X', ps: 'Square', p1: 'F', p2: 'Y' },
+  { action: 'Repair tower', xbox: 'Y', ps: 'Triangle', p1: 'R', p2: 'H' },
+  { action: 'Attack: pick unit (hold 0.8 s = lock)', xbox: 'Right stick', ps: 'Right stick', p1: 'Arrow keys', p2: 'Numpad 8 4 2 6' },
+  { action: 'Show / hide attack menu', xbox: 'RS click', ps: 'R3', p1: 'Space / V', p2: 'M' },
+  { action: 'Target enemy (Battle)', xbox: 'LB', ps: 'L1', p1: '] / [', p2: ', / .' },
+  { action: 'Grab rock (hold) / drop (release)', xbox: 'RT', ps: 'R2', p1: 'G', p2: 'B' },
+  { action: 'Missile (hold 3 s, release early to cancel)', xbox: 'LT', ps: 'L2', p1: 'C', p2: ';' },
+  { action: 'Pause', xbox: 'Menu', ps: 'Start', p1: 'Esc / P', p2: 'Numpad 0' },
+  { action: 'Menu confirm / back (any device)', xbox: 'A / B', ps: 'Cross / Circle', p1: 'Enter / Backspace', p2: 'Enter / Backspace' },
 ];

@@ -14,6 +14,8 @@ export interface BattlePlayerSetup {
   controller: BattleController;
   /** 0..1, scales this player's Max Hits and starting Thorium (default 1). */
   strength?: number;
+  /** PLAYER_COLORS index (lobby choice); defaults to the player id. */
+  colorIndex?: number;
 }
 
 export interface BattleSetup {
@@ -96,7 +98,7 @@ export function startBattle(setup: BattleSetup): NewGameOptions {
   const strength = [1, 1, 1, 1];
   const slots: PlayerSlot[] = setup.players.map((p) => {
     strength[p.id] = clampStrength(p.strength);
-    return { id: p.id, team: p.team, controller: p.controller };
+    return { id: p.id, team: p.team, controller: p.controller, colorIndex: p.colorIndex };
   });
   return {
     settings: {

@@ -22,6 +22,7 @@ function emptyPlayer(id: PlayerId): Player {
     id,
     team: 100 + id,
     controller: 'none',
+    colorIndex: id,
     alive: false,
     thorium: 0,
     tech: {},
@@ -57,6 +58,7 @@ export function createWorld(opts: NewGameOptions): World {
     const controller: Controller = slot.controller;
     p.team = slot.team;
     p.controller = controller;
+    p.colorIndex = slot.colorIndex ?? slot.id;
     p.alive = controller !== 'none';
     const scripted = controller === 'script';
     const f = settings.mode === 'battle' ? strengthFactor(settings.strength[slot.id]) : 1;

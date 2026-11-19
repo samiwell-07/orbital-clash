@@ -14,6 +14,7 @@ import { UnitSystem } from './units';
 
 export { ROCK_RADIUS } from './rocks';
 export { BASE_RADIUS } from './base';
+export { buildShipCraft } from './ship';
 export { upgradeMarks, platformVariant } from './structures/marks';
 
 const MAX_DT = 0.1;

@@ -1,4 +1,5 @@
 import { DIFFICULTY_MULT, MAX_COOP_PLAYERS } from '../../config/constants';
+import { createLobbyScreen } from './lobby';
 import { researchDef } from '../../data';
 import { getArea } from '../../meta/save';
 import { RANKED_DIFFICULTY } from '../../meta/rank';
@@ -29,7 +30,6 @@ export function createBriefingScreen(area: AreaSummary): Screen {
     const d = DIFFICULTY_ORDER.indexOf(rec?.lastDifficulty ?? save.settings.defaultDifficulty);
     return new Form([
       { k: 'choice', id: 'difficulty', label: 'Difficulty', options: DIFFICULTY_LABELS, index: Math.max(0, d) },
-      { k: 'choice', id: 'coop', label: 'Players (co-op)', options: ['1 Player', '2 Players', '3 Players'].slice(0, MAX_COOP_PLAYERS), index: Math.max(0, (rec?.coopPlayers ?? 1) - 1) },
       { k: 'button', id: 'start', label: 'Launch Mission', icon: 'arrow' },
       { k: 'button', id: 'back', label: 'Back' },
     ]);
@@ -41,10 +41,15 @@ export function createBriefingScreen(area: AreaSummary): Screen {
       const ev = form.handle(nav, dt);
       if (ev.back || ev.activated === 'back') return { t: 'pop' };
       if (ev.activated === 'start') {
-        return {
-          t: 'startCampaign', cometId: area.cometId, index: area.index, resurgence: area.resurgence,
-          difficulty: DIFFICULTY_ORDER[form.value('difficulty')], coop: form.value('coop') + 1,
-        };
+        const difficulty = DIFFICULTY_ORDER[form.value('difficulty')];
+        const lobby = createLobbyScreen({
+          title: area.name,
+          subtitle: `Co-op · up to ${MAX_COOP_PLAYERS} players`,
+          // The alien (player 1) keeps red.
+          rules: { minPlayers: 1, maxPlayers: MAX_COOP_PLAYERS, takenColors: [1] },
+          onStart: (seats) => ({ t: 'startCampaign', cometId: area.cometId, index: area.index, resurgence: area.resurgence, difficulty, seats }),
+        });
+        return { t: 'push', screen: lobby };
       }
       return null;
     },

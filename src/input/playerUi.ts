@@ -3,9 +3,12 @@ import { TUNING } from './bindings';
 
 export type AttackEvent = { t: 'select'; kind: UnitKind | null } | { t: 'lock'; locked: boolean };
 
-/** Per-player menu state machine (none/build/attack/pause) plus the attack hold-to-lock timer. */
+/**
+ * Per-player menu state machine (none/build/pause), the attack-menu display toggle and the
+ * right-stick hold-to-lock timer. The right stick attacks whether or not the attack menu is shown.
+ */
 export class PlayerUiMachine {
-  readonly state: PlayerUi = { menu: 'none', buildIndex: 0, attackIndex: -1 };
+  readonly state: PlayerUi = { menu: 'none', buildIndex: 0, attackIndex: -1, attackShown: false, missileCharge: 0 };
   private heldIdx = -1;
   private holdTime = 0;
   private locked = false;
@@ -14,22 +17,28 @@ export class PlayerUiMachine {
     return this.state.menu;
   }
 
-  toggleBuild(): AttackEvent[] {
-    return this.switchTo(this.state.menu === 'build' ? 'none' : 'build');
+  toggleBuild(): void {
+    this.state.menu = this.state.menu === 'build' ? 'none' : 'build';
   }
 
-  toggleAttack(): AttackEvent[] {
-    return this.switchTo(this.state.menu === 'attack' ? 'none' : 'attack');
+  /** RS/R3: show or hide the attack menu (display only). */
+  toggleAttackDisplay(): void {
+    this.state.attackShown = !this.state.attackShown;
   }
 
-  /** Back button: closes the build or attack menu. Returns whether a menu was open. */
-  back(): { closed: boolean; events: AttackEvent[] } {
-    if (this.state.menu === 'none' || this.state.menu === 'pause') return { closed: false, events: [] };
-    return { closed: true, events: this.switchTo('none') };
+  /** Back button: closes the build menu. Returns whether it was open. */
+  back(): { closed: boolean } {
+    if (this.state.menu !== 'build') return { closed: false };
+    this.state.menu = 'none';
+    return { closed: true };
   }
 
+  /** Pausing drops a held (unlocked) attack pick; a locked attack stays locked. */
   setPause(on: boolean): AttackEvent[] {
-    return this.switchTo(on ? 'pause' : 'none');
+    const ev = on ? this.release() : [];
+    this.state.menu = on ? 'pause' : 'none';
+    this.state.missileCharge = 0;
+    return ev;
   }
 
   moveBuild(step: number, count: number): void {
@@ -45,12 +54,12 @@ export class PlayerUiMachine {
   }
 
   /**
-   * Attack menu tick. `stickIdx` is the unit sector under the right stick (-1 neutral).
+   * Right-stick tick. `stickIdx` is the unit sector under the stick (-1 neutral).
    * Tilting selects (and the sim releases units while held); releasing deselects unless locked;
    * holding the same direction for attackLockSec locks; tilting again unlocks.
    */
   updateAttack(stickIdx: number, kinds: readonly UnitKind[], dt: number): AttackEvent[] {
-    if (this.state.menu !== 'attack') return [];
+    if (this.state.menu === 'pause') return [];
     const ev: AttackEvent[] = [];
     const idx = stickIdx >= 0 && stickIdx < kinds.length ? stickIdx : -1;
     if (idx !== this.heldIdx) {
@@ -77,17 +86,14 @@ export class PlayerUiMachine {
     return ev;
   }
 
-  private switchTo(menu: MenuId): AttackEvent[] {
+  private release(): AttackEvent[] {
     const ev: AttackEvent[] = [];
-    if (this.state.menu === 'attack' && menu !== 'attack') {
-      if (this.locked) ev.push({ t: 'lock', locked: false });
-      if (this.state.attackIndex >= 0) ev.push({ t: 'select', kind: null });
-      this.locked = false;
-      this.heldIdx = -1;
-      this.holdTime = 0;
+    if (!this.locked && this.state.attackIndex >= 0) {
+      ev.push({ t: 'select', kind: null });
       this.state.attackIndex = -1;
     }
-    this.state.menu = menu;
+    this.heldIdx = -1;
+    this.holdTime = 0;
     return ev;
   }
 }

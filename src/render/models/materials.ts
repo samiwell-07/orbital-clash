@@ -1,6 +1,6 @@
 import { Color, MeshBasicMaterial, MeshStandardMaterial, AdditiveBlending, DoubleSide } from 'three';
 import type { Material } from 'three';
-import { TEAM_BODY, TEAM_GLINT, TEAM_GLOW, teamIndex } from '@/render/instancing/colorTables';
+import { TEAM_BODY, TEAM_GLINT, TEAM_GLOW, paletteIndex } from '@/render/instancing/colorTables';
 
 const registry = new Map<string, Material>();
 
@@ -37,12 +37,12 @@ export const platformMat = (): MeshStandardMaterial => memo('platform', () => st
 
 /** Shared team trim ring/crest: owner-colour emissive (style guide section 5). */
 export const teamTrimMat = (team: number): MeshStandardMaterial => {
-  const t = teamIndex(team);
+  const t = paletteIndex(team);
   return memo(`trim${t}`, () => glowMat(TEAM_GLOW[t], 1.5));
 };
 
 export const unitBodyMat = (team: number): MeshStandardMaterial => {
-  const t = teamIndex(team);
+  const t = paletteIndex(team);
   return memo(`ubody${t}`, () => {
     const m = stdMat(TEAM_BODY[t], 0.4, 0.35);
     m.emissive = new Color(TEAM_GLOW[t]);
@@ -52,7 +52,7 @@ export const unitBodyMat = (team: number): MeshStandardMaterial => {
 };
 
 export const unitGlowMat = (team: number): MeshStandardMaterial => {
-  const t = teamIndex(team);
+  const t = paletteIndex(team);
   return memo(`uglow${t}`, () => {
     const m = glowMat(TEAM_GLOW[t], 3.2, true);
     m.color = new Color(TEAM_GLINT[t]).multiplyScalar(0.5);

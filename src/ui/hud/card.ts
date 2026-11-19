@@ -75,6 +75,12 @@ function weaponStats(kind: StructureKind, level: number): string | null {
   return `Range ${d.range[i]} · Dmg ${d.damage[i]} · ${d.cooldown[i]}s · ${targets}`;
 }
 
+function siloStats(s: Structure): string | null {
+  if (s.kind !== 'missileSilo') return null;
+  if (s.buildProgress < 1 || s.cooldown > 0) return `Missile loading · ${Math.ceil(s.cooldown)}s`;
+  return 'Missile ready · hold LT / L2 to fire';
+}
+
 export function structureCard(world: World, s: Structure, viewer: PlayerId): StructureCard {
   const c = costsOf(s.kind);
   const own = s.owner === viewer || world.players[s.owner]?.team === world.players[viewer]?.team;
@@ -96,7 +102,7 @@ export function structureCard(world: World, s: Structure, viewer: PlayerId): Str
     repair: own && s.hp < s.maxHp ? Math.ceil(DEFS.repairCost(c.buildCost, s.hp, s.maxHp) - 1e-9) : null,
     output: s.output,
     nextOutput: own && !maxed ? nextUnit(s.kind, s.level) : null,
-    stats: weaponStats(s.kind, s.level),
+    stats: weaponStats(s.kind, s.level) ?? (own ? siloStats(s) : null),
     locked,
   };
 }

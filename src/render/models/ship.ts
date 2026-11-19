@@ -39,6 +39,42 @@ const engineGeometry = (): BufferGeometry => assemble([
   { g: sph(0.13, 6, 4), p: [-1.08, 0, -0.42], s: [1.6, 1, 1], smooth: true },
 ]);
 
+export interface ShipCraft {
+  craft: Group;
+  engine: Mesh;
+}
+
+/**
+ * The player craft (hull, trim in `colorHex`, engine, canopy) at unit model scale; shared by the in-game ship and
+ * the lobby preview. `own` receives every material created (for disposal); geometries are shared via `cached`.
+ */
+export function buildShipCraftParts(colorHex: number, own: <T extends Material>(m: T) => T = (m) => m): ShipCraft {
+  const craft = new Group();
+  const trimMat = own(stdMat(colorHex, 0.5, 0.35));
+  trimMat.emissive = new Color(colorHex);
+  trimMat.emissiveIntensity = 0.9;
+  const engineMat = own(glowMat(0x9fe0ff, 3.8));
+  const canopyMat = own(glowMat(0x9fe0ff, 1.3));
+  const parts: [BufferGeometry, Material][] = [
+    [cached('ship:hull', hullGeometry), own(stdMat(0xffffff, 0.75, 0.32))],
+    [cached('ship:trim', trimGeometry), trimMat],
+    [cached('ship:engine', engineGeometry), engineMat],
+    [cached('ship:canopy', () => sph(0.17, 8, 5).scale(1.5, 0.7, 0.8).translate(0.25, 0.16, 0)), canopyMat],
+  ];
+  let engine!: Mesh;
+  for (const [g, m] of parts) {
+    const mesh = new Mesh(g, m);
+    mesh.castShadow = true;
+    craft.add(mesh);
+    if (m === engineMat) engine = mesh;
+  }
+  return { craft, engine };
+}
+
+export function buildShipCraft(colorHex: number, own?: <T extends Material>(m: T) => T): Group {
+  return buildShipCraftParts(colorHex, own).craft;
+}
+
 interface ShipView {
   root: Group;
   craft: Group;
@@ -62,6 +98,8 @@ export class ShipSystem implements ModelSystem {
   load(_world: World): void {
     for (const v of this.views) { v?.root.removeFromParent(); v?.beam.removeFromParent(); }
     this.views.length = 0;
+    for (const d of this.owned) d.dispose();
+    this.owned.length = 0;
   }
 
   update(f: FrameInfo): void {
@@ -133,27 +171,9 @@ export class ShipSystem implements ModelSystem {
     const team = teamIndex(i);
     const own = <T extends Material>(m: T): T => { this.owned.push(m); return m; };
     const root = new Group();
-    const craft = new Group();
+    const { craft, engine } = buildShipCraftParts(TEAM_GLOW[team], own);
     craft.scale.setScalar(SHIP_SCALE);
     root.add(craft);
-    const trimMat = own(stdMat(TEAM_GLOW[team], 0.5, 0.35));
-    trimMat.emissive = new Color(TEAM_GLOW[team]);
-    trimMat.emissiveIntensity = 0.9;
-    const engineMat = own(glowMat(0x9fe0ff, 3.8));
-    const canopyMat = own(glowMat(0x9fe0ff, 1.3));
-    const parts: [BufferGeometry, Material][] = [
-      [cached('ship:hull', hullGeometry), own(stdMat(0xffffff, 0.75, 0.32))],
-      [cached('ship:trim', trimGeometry), trimMat],
-      [cached('ship:engine', engineGeometry), engineMat],
-      [cached('ship:canopy', () => sph(0.17, 8, 5).scale(1.5, 0.7, 0.8).translate(0.25, 0.16, 0)), canopyMat],
-    ];
-    let engine!: Mesh;
-    for (const [g, m] of parts) {
-      const mesh = new Mesh(g, m);
-      mesh.castShadow = true;
-      craft.add(mesh);
-      if (m === engineMat) engine = mesh;
-    }
     const shadowMat = own(new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
     const shadow = new Mesh(cached('ship:shadow', () => new CircleGeometry(1, 16).rotateX(-Math.PI / 2)), shadowMat);
     root.add(shadow);

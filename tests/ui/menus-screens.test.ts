@@ -158,7 +158,7 @@ describe('ScreenManager', () => {
   };
 
   it('handles push/pop internally and surfaces only commands', () => {
-    const child = mk('child', (n) => (n === 0 ? null : n === 1 ? { t: 'startBattle', setup: { mapId: 'x', slots: [], maxHits: 10, thoriumRate: 1, timeLimitSec: 0, profile: 'base' } } : { t: 'pop' }));
+    const child = mk('child', (n) => (n === 0 ? null : n === 1 ? { t: 'startBattle', seats: [], setup: { mapId: 'x', slots: [], maxHits: 10, thoriumRate: 1, timeLimitSec: 0, profile: 'base' } } : { t: 'pop' }));
     const root = mk('root', () => ({ t: 'push', screen: child }));
     const m = createScreenManager(() => data, root);
     expect(m.update(NO_NAV, 0.016)).toBeNull();

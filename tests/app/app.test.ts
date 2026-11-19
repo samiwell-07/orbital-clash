@@ -4,28 +4,50 @@ import { buildRun } from '@/app/runSpec';
 import { createSession } from '@/app/session';
 import { battleOutcome, finishRun } from '@/app/runEnd';
 import { newSave } from '@/meta';
+import { createKeyboard } from '@/input/keyboard';
 import type { PlayerId } from '@/types';
 
 registerAllSystems();
 
 describe('app glue', () => {
-  it('builds a campaign run with the right humans', () => {
-    const spec = buildRun({ t: 'startCampaign', cometId: 'kreios', index: 0, resurgence: false, difficulty: 'normal', coop: 2 });
+  it('builds a campaign run from lobby seats: humans 0 and 2, their devices and colours', () => {
+    const seats = [{ device: 'pad1' as const, colorIndex: 4 }, { device: 'pad0' as const, colorIndex: 0 }];
+    const spec = buildRun({ t: 'startCampaign', cometId: 'kreios', index: 0, resurgence: false, difficulty: 'normal', seats });
     if (typeof spec === 'string') throw new Error(spec);
     expect(spec.humans).toEqual([0, 2]);
+    expect(spec.bindings).toEqual([{ player: 0, device: 'pad1', peer: 0 }, { player: 2, device: 'pad0', peer: 0 }]);
+    const colours = Object.fromEntries(spec.options.slots.map((s) => [s.id, s.colorIndex]));
+    expect(colours).toEqual({ 0: 4, 1: undefined, 2: 0 });
     expect(spec.mission?.id).toBeTruthy();
+  });
+
+  it('builds a battle run: seats go to the human slots in order, CPUs keep default colours', () => {
+    const spec = buildRun({
+      t: 'startBattle',
+      seats: [{ device: 'kb1', colorIndex: 6 }],
+      setup: {
+        mapId: 'battle-kreios-crater', maxHits: 5, thoriumRate: 1, timeLimitSec: 0, profile: 'base',
+        slots: [{ human: true, team: 0, strength: 1 }, { human: false, team: 1, strength: 1 }],
+      },
+    });
+    if (typeof spec === 'string') throw new Error(spec);
+    expect(spec.bindings).toEqual([{ player: 0, device: 'kb1', peer: 0 }]);
+    const session = createSession(spec);
+    expect(session.sim.world.players.slice(0, 2).map((p) => p.colorIndex)).toEqual([6, 1]);
+    session.dispose();
   });
 
   it('reports an invalid battle setup as a message instead of throwing', () => {
     const res = buildRun({
       t: 'startBattle',
+      seats: [],
       setup: { mapId: 'battle-kreios-crater', slots: [{ human: true, team: 0, strength: 1 }], maxHits: 10, thoriumRate: 1, timeLimitSec: 0, profile: 'base' },
     });
     expect(typeof res).toBe('string');
   });
 
   it('runs a campaign session for a few seconds and finishes a lost run cleanly', () => {
-    const spec = buildRun({ t: 'startCampaign', cometId: 'kreios', index: 0, resurgence: false, difficulty: 'normal', coop: 1 });
+    const spec = buildRun({ t: 'startCampaign', cometId: 'kreios', index: 0, resurgence: false, difficulty: 'normal', seats: [{ device: 'kb1', colorIndex: 0 }] });
     if (typeof spec === 'string') throw new Error(spec);
     const session = createSession(spec);
     for (let i = 0; i < 300; i++) session.sim.step([]);
@@ -41,6 +63,7 @@ describe('app glue', () => {
   it('names the winner of a two-human battle instead of showing Defeat to player 1', () => {
     const spec = buildRun({
       t: 'startBattle',
+      seats: [{ device: 'pad0', colorIndex: 0 }, { device: 'pad1', colorIndex: 1 }],
       setup: {
         mapId: 'battle-kreios-crater', maxHits: 5, thoriumRate: 1, timeLimitSec: 0, profile: 'base',
         slots: [{ human: true, team: 0, strength: 1 }, { human: true, team: 1, strength: 1 }],
@@ -67,9 +90,36 @@ describe('app glue', () => {
     expect(battleOutcome(teams, [0, 1], 1)).toEqual({ won: true, title: 'Team B Wins', neutral: true });
   });
 
+  it('auto-pauses once when a bound controller unplugs, and lets the others resume without it', () => {
+    const pad = () => ({ connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad(), pad()];
+    const spec = buildRun({
+      t: 'startBattle',
+      seats: [{ device: 'pad0', colorIndex: 0 }, { device: 'pad1', colorIndex: 1 }],
+      setup: {
+        mapId: 'battle-kreios-crater', maxHits: 5, thoriumRate: 1, timeLimitSec: 0, profile: 'base',
+        slots: [{ human: true, team: 0, strength: 1 }, { human: true, team: 1, strength: 1 }],
+      },
+    });
+    if (typeof spec === 'string') throw new Error(spec);
+    const session = createSession(spec, { getGamepads: () => pads, keyboard: createKeyboard(null) });
+    session.frame(1 / 60);
+    expect(session.sim.world.paused).toBe(false);
+    expect(session.pauseNotice()).toBeNull();
+    pads[1].connected = false;
+    session.frame(1 / 60);
+    expect(session.sim.world.paused).toBe(true);
+    expect(session.pauseNotice()).toContain('P2 controller disconnected');
+    session.sim.step(session.input.setPaused(false));
+    for (let i = 0; i < 5; i++) session.frame(1 / 60);
+    expect(session.sim.world.paused).toBe(false);
+    session.dispose();
+  });
+
   it('plays an AI-only battle to a result', () => {
     const spec = buildRun({
       t: 'startBattle',
+      seats: [],
       setup: {
         mapId: 'battle-kreios-crater', maxHits: 5, thoriumRate: 2, timeLimitSec: 0, profile: 'base',
         slots: [{ human: false, team: 0, strength: 1 }, { human: false, team: 1, strength: 1 }],

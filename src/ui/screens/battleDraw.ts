@@ -1,4 +1,4 @@
-import { COLORS, drawText, playerColor, type Ctx } from '../theme';
+import { COLORS, drawText, paletteCss, type Ctx } from '../theme';
 import type { Rect } from '../layout';
 import { drawIcon } from '../widgets/icon';
 import { drawPanel } from '../widgets/panel';
@@ -54,7 +54,7 @@ export function drawSlotSummary(ctx: Ctx, r: Rect, cfg: BattleConfig): void {
   cfg.slots.forEach((s, i) => {
     const x = r.x + 20 + i * w;
     drawPlayerGlyph(ctx, { x, y: r.y + 18, w: w - 14, h: w - 14 }, i, { enemy: !s.human, team: s.team });
-    drawText(ctx, TEAM_NAMES[s.team] ?? `Team ${s.team + 1}`, x + (w - 14) / 2, r.y + w + 14, { size: 14, color: playerColor(s.team), align: 'center', weight: 700 });
+    drawText(ctx, TEAM_NAMES[s.team] ?? `Team ${s.team + 1}`, x + (w - 14) / 2, r.y + w + 14, { size: 14, color: paletteCss(s.team), align: 'center', weight: 700 });
     drawText(ctx, `${Math.round(s.strength * 100)}%`, x + (w - 14) / 2, r.y + w + 36, { size: 14, color: COLORS.dim, align: 'center' });
   });
 }

@@ -44,7 +44,7 @@ export class PauseMenu {
     }
   }
 
-  draw(ctx: Ctx, full: Rect, s: number, now: number, prefer: ControlsDisplay): void {
+  draw(ctx: Ctx, full: Rect, s: number, now: number, prefer: ControlsDisplay, notice: string | null = null): void {
     drawBackdrop(ctx, full, 0.62);
     if (this.showControls) {
       const w = Math.min(full.w * 0.9, 1240 * s);
@@ -55,7 +55,8 @@ export class PauseMenu {
     const w = 380 * s;
     const cx = full.x + full.w / 2;
     glowText(ctx, 'PAUSED', cx, full.y + full.h * 0.28, { size: 56 * s, color: COLORS.text, glow: COLORS.cyan, align: 'center', spacing: 12 * s, weight: 700 });
+    if (notice) drawText(ctx, notice, cx, full.y + full.h * 0.34, { size: 20 * s, color: COLORS.danger, align: 'center', weight: 700 });
     drawForm(ctx, this.form, { x: cx - w / 2, y: full.y + full.h * 0.38, w, h: 420 * s }, now, { rowH: 58 * s, gap: 12 * s });
-    drawText(ctx, 'Start to resume', cx, full.y + full.h * 0.84, { size: 14 * s, color: COLORS.dim, align: 'center' });
+    drawText(ctx, 'Menu / Start to resume', cx, full.y + full.h * 0.84, { size: 14 * s, color: COLORS.dim, align: 'center' });
   }
 }

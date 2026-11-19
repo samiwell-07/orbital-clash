@@ -68,18 +68,19 @@ describe('authored areas', () => {
     }
   });
 
-  it('hints name controls as "(pad / key)" pairs that match one BINDING_ROWS row', () => {
+  it('hints name controls as "(xbox · ps / key)" triples that match one BINDING_ROWS row', () => {
     const tokens = (s: string) => s.split(' / ').map((t) => t.replace(/\s*\(.*\)$/, '').replace(/^Hold /, '').trim());
-    const pairs = BINDING_ROWS.map((r) => ({ pad: tokens(r.pad), key: tokens(r.p1) }));
-    const bare = /\b(R1|R2|R3|L1|L2|L3|Shift|Tab|Esc|Start|Square|Triangle|Cross|Circle)\b|\b[A-Z]\s*\/\s*[A-Z]\b/;
+    const rows = BINDING_ROWS.map((r) => ({ xbox: tokens(r.xbox), ps: tokens(r.ps), key: tokens(r.p1) }));
+    const bare = /\b(RB|LB|RT|LT|RS|LS|R1|R2|R3|L1|L2|L3|Shift|Tab|Esc|Start|Square|Triangle|Cross|Circle)\b|\b[A-Z]\s*\/\s*[A-Z]\b/;
     let named = 0;
     for (const m of ALL_MISSIONS) {
       for (const h of m.hints) {
-        for (const [, pad, key] of h.matchAll(/\(([^()]+?) \/ ([^()]+?)\)/g)) {
+        for (const [, xbox, ps, key] of h.matchAll(/\(([^()]+?) · ([^()]+?) \/ ([^()]+?)\)/g)) {
           named++;
-          expect(pairs.some((p) => p.pad.includes(pad) && p.key.includes(key)), `${m.id}: "${pad} / ${key}"`).toBe(true);
+          const ok = rows.some((r) => r.xbox.includes(xbox) && r.ps.includes(ps) && r.key.includes(key));
+          expect(ok, `${m.id}: "${xbox} · ${ps} / ${key}"`).toBe(true);
         }
-        expect(h.replace(/\([^()]*\)/g, ''), `${m.id}: control named outside "(pad / key)"`).not.toMatch(bare);
+        expect(h.replace(/\([^()]*\)/g, ''), `${m.id}: control named outside "(xbox · ps / key)"`).not.toMatch(bare);
       }
     }
     expect(named).toBeGreaterThan(0);

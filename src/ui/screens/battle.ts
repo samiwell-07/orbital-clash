@@ -3,6 +3,7 @@ import { drawForm } from '../menus/formDraw';
 import { drawFooter, drawHeader } from './common';
 import { drawMapCard, drawSlotSummary } from './battleDraw';
 import { battleRows, readValues, toConfig, valuesFromSetup, type BattleValues } from './battleForm';
+import { createLobbyScreen } from './lobby';
 import type { Screen, ScreenCtx } from './types';
 
 export function createBattleScreen(): Screen {
@@ -21,7 +22,19 @@ export function createBattleScreen(): Screen {
       const maps = ctx.data.maps;
       const ev = f.handle(nav, dt);
       if (ev.back || ev.activated === 'back') return { t: 'pop' };
-      if (ev.activated === 'start') return { t: 'startBattle', setup: toConfig(values as BattleValues, maps) };
+      if (ev.activated === 'start') {
+        const setup = toConfig(values as BattleValues, maps);
+        const humans = setup.slots.filter((s) => s.human).length;
+        // CPU slots keep their default colour (= player id), so humans can't pick those.
+        const cpuColors = setup.slots.flatMap((s, i) => (s.human ? [] : [i]));
+        const lobby = createLobbyScreen({
+          title: 'Battle',
+          subtitle: `${humans} human player${humans === 1 ? '' : 's'} · ${setup.slots.length - humans} CPU`,
+          rules: { minPlayers: humans, maxPlayers: humans, takenColors: cpuColors },
+          onStart: (seats) => ({ t: 'startBattle', setup, seats }),
+        });
+        return { t: 'push', screen: lobby };
+      }
       if (ev.changed) {
         values = readValues(f, values as BattleValues, maps);
         f.setRows(battleRows(values, maps));

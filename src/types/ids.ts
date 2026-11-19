@@ -42,5 +42,9 @@ export type GameMode = 'campaign' | 'battle';
 /** Rules profile: original game vs Bionic Swarm expansion. */
 export type Profile = 'base' | 'bionic';
 
-/** Ship/base colours: blue, red, purple, orange-yellow (seen in screenshots). */
-export const PLAYER_COLORS: readonly number[] = [0x3aa0ff, 0xff4a4a, 0xb55cff, 0xffb02e];
+/**
+ * Selectable player colour palette (lobby). Indices 0-3 are the original defaults (blue, red, purple, orange-yellow):
+ * player i uses colour i unless the lobby picked another one (see config/playerColors).
+ */
+export const PLAYER_COLORS: readonly number[] = [0x3aa0ff, 0xff4a4a, 0xb55cff, 0xffb02e, 0x3ee07a, 0x2ee6e6, 0xff5fc8, 0xf2f2f2];
+export const PLAYER_COLOR_NAMES: readonly string[] = ['Blue', 'Red', 'Purple', 'Orange', 'Green', 'Cyan', 'Pink', 'White'];

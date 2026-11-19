@@ -7,7 +7,10 @@ import { PLAYER_COLORS, ALL_UNITS } from '@/types';
 import { GROWN_VARIANT, maxLevelOf, platformVariant, upgradeMarks } from '@/render/models/structures/marks';
 import { crackGlow, damageDarken, flicker, hpRatio, shieldRing, smokeAmount, storageGlow } from '@/render/models/damage';
 import { angleDiff, approachAngle, bobHeight, snakeBobPhase } from '@/render/models/motion';
-import { BoxGeometry, Matrix4, MeshBasicMaterial } from 'three';
+import { BoxGeometry, Matrix4, Mesh, MeshBasicMaterial } from 'three';
+import type { Material, MeshStandardMaterial } from 'three';
+import { buildShipCraft } from '@/render/models/ship';
+import { createShipPreview } from '@/render/preview';
 
 describe('SlotAllocator / InstancedPool', () => {
   it('reuses released indices before growing the high-water mark', () => {
@@ -58,9 +61,11 @@ describe('SlotAllocator / InstancedPool', () => {
 });
 
 describe('colour tables', () => {
-  it('has four team entries and glow equals PLAYER_COLORS', () => {
-    expect(TEAM_BODY).toHaveLength(4);
-    expect(TEAM_GLINT).toHaveLength(4);
+  it('has one entry per palette colour, keeps the original four, and glow equals PLAYER_COLORS', () => {
+    expect(TEAM_BODY).toHaveLength(PLAYER_COLORS.length);
+    expect(TEAM_GLINT).toHaveLength(PLAYER_COLORS.length);
+    expect(TEAM_BODY.slice(0, 4)).toEqual([0x2a9fd8, 0xc0222b, 0x9b44e6, 0xffc21a]);
+    expect(TEAM_GLINT.slice(0, 4)).toEqual([0x8fe8ff, 0xf0f0f0, 0xe9d6ff, 0xff7a1a]);
     expect(TEAM_GLOW).toEqual(PLAYER_COLORS);
   });
 
@@ -90,6 +95,25 @@ describe('colour tables', () => {
     expect(laserColor(0, 3)).toBe(0x4dd8ff);
     expect(laserColor(3, 3)).toBe(0xff4dd2);
     expect(laserColor(0, 0)).toBe(0x4dd8ff);
+  });
+});
+
+describe('ship craft', () => {
+  it('builds hull, trim, engine and canopy with the trim in the given colour', () => {
+    const mats: Material[] = [];
+    const craft = buildShipCraft(0x3ee07a, (m) => { mats.push(m); return m; });
+    const meshes = craft.children.filter((c): c is Mesh => c instanceof Mesh);
+    expect(meshes).toHaveLength(4);
+    expect(mats).toHaveLength(4);
+    const trim = meshes[1].material as MeshStandardMaterial;
+    expect(trim.color.getHex()).toBe(0x3ee07a);
+    expect(trim.emissive.getHex()).toBe(0x3ee07a);
+    const other = buildShipCraft(0xff5fc8).children[1] as Mesh;
+    expect((other.material as MeshStandardMaterial).emissive.getHex()).toBe(0xff5fc8);
+  });
+
+  it('returns no preview (instead of throwing) without WebGL', () => {
+    expect(createShipPreview(64)).toBeNull();
   });
 });
 

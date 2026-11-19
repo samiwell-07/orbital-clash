@@ -1,6 +1,7 @@
 import { CircleGeometry, Group, Matrix4, MeshBasicMaterial } from 'three';
 import { UNIT_DEFS } from '@/data';
 import { TICK_DT } from '@/config/constants';
+import { PALETTE_SIZE } from '@/config/playerColors';
 import type { UnitKind, World } from '@/types';
 import { ALL_UNITS } from '@/types';
 import { InstancedPool } from '@/render/instancing/InstancedPool';
@@ -25,7 +26,7 @@ interface UnitSet { body: InstancedPool; glow: InstancedPool }
 /** Every unit kind x team is two InstancedMeshes (lit body + emissive glow) fed from world.units each frame. */
 export class UnitSystem implements ModelSystem {
   readonly group = new Group();
-  private readonly sets: (UnitSet | undefined)[] = new Array(KIND_COUNT * 4).fill(undefined);
+  private readonly sets: (UnitSet | undefined)[] = new Array(KIND_COUNT * PALETTE_SIZE).fill(undefined);
   private readonly shadow: InstancedPool;
   private readonly m = new Matrix4();
   private readonly shadowMat = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.26, depthWrite: false });
@@ -51,7 +52,7 @@ export class UnitSystem implements ModelSystem {
       if (u.state === 'dead') continue;
       const def = UNIT_DEFS[u.kind];
       const team = teamIndex(u.owner);
-      const key = (KIND_INDEX.get(u.kind) ?? 0) * 4 + team;
+      const key = (KIND_INDEX.get(u.kind) ?? 0) * PALETTE_SIZE + team;
       const set = this.sets[key] ?? this.makeSet(u.kind, team, key);
       const step = u.state === 'marching' ? def.speed * alpha * TICK_DT : 0;
       const ch = Math.cos(u.heading);

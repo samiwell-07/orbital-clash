@@ -1,6 +1,6 @@
 import { TorusGeometry } from 'three';
 import { assemble, cached, cyl, slab, sph } from '@/render/instancing/kit';
-import { TEAM_GLOW, teamIndex } from '@/render/instancing/colorTables';
+import { TEAM_GLOW, paletteIndex } from '@/render/instancing/colorTables';
 import { TOP, ViewBuilder } from './common';
 import type { StructureView } from './common';
 
@@ -44,7 +44,7 @@ export function buildWaypoint(team: number): StructureView {
     { g: cyl(0.1, 0.1, 0.03, 8), p: [0, 0.095, 0], c: D },
   ]));
   b.mesh(base, bodyMat, b.root, 0, TOP, 0);
-  const mark = b.glow(TEAM_GLOW[teamIndex(team)], 3.2);
+  const mark = b.glow(TEAM_GLOW[paletteIndex(team)], 3.2);
   const chevron = b.group(b.root, 0, TOP + 0.4, 0);
   const vGeo = cached('way:chevron', () => assemble([0, 0.14].map((x) => ({
     g: slab([[0.3 - x, 0], [-0.1 - x, 0.3], [-0.1 - x, 0.15], [0.05 - x, 0], [-0.1 - x, -0.15], [-0.1 - x, -0.3]], 0.05),

@@ -40,14 +40,34 @@ export interface AttackMenuView {
   locked: boolean;
   player: number;
   target: number;
-  /** Battle with several enemies: show the L1 hint. */
+  /** Battle with several enemies: show the LB / L1 hint. */
   cycleHint: boolean;
   enemyTarget: boolean;
 }
 
 export const ATTACK_RADIUS = 138;
 
-/** R3 radial: unit icons around a centre target glyph, pips below each icon, yellow lock bar on a locked pick. */
+/** Missile button hold: a ring around the ship that fills over the charge time, then the silos fire. */
+export function drawMissileCharge(ctx: Ctx, at: { x: number; y: number }, charge: number, s: number): void {
+  const r = 30 * s;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4 * s;
+  ctx.strokeStyle = 'rgba(11,12,16,0.7)';
+  ctx.beginPath();
+  ctx.arc(at.x, at.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = COLORS.danger;
+  ctx.shadowColor = COLORS.danger;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(at.x, at.y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, charge));
+  ctx.stroke();
+  ctx.restore();
+  drawText(ctx, 'MISSILE', at.x, at.y - r - 10 * s, { size: 11 * s, color: COLORS.danger, align: 'center', spacing: 1.5 * s, weight: 700 });
+}
+
+/** RS / R3 radial: unit icons around a centre target glyph, pips below each icon, yellow lock bar on a locked pick. */
 export function drawAttackMenu(ctx: Ctx, center: { x: number; y: number }, bounds: Rect, v: AttackMenuView, s: number, now: number): void {
   const R = ATTACK_RADIUS * s;
   const ext = R + 130 * s;
@@ -72,7 +92,7 @@ export function drawAttackMenu(ctx: Ctx, center: { x: number; y: number }, bound
 
   drawPlayerGlyph(ctx, { x: cx - 34 * s, y: cy - 34 * s, w: 68 * s, h: 68 * s }, v.target, { enemy: v.enemyTarget });
   drawIcon(ctx, 'target', cx + 30 * s, cy - 30 * s, 20 * s, COLORS.danger);
-  if (v.cycleHint) drawText(ctx, 'L1  CHANGE TARGET', cx, cy + 52 * s, { size: 11 * s, color: COLORS.cyan, align: 'center', spacing: 1.5 * s, weight: 700 });
+  if (v.cycleHint) drawText(ctx, 'LB / L1  CHANGE TARGET', cx, cy + 52 * s, { size: 11 * s, color: COLORS.cyan, align: 'center', spacing: 1.5 * s, weight: 700 });
 
   v.slots.forEach((sl, i) => {
     const a = slotAngle(i, v.slots.length);

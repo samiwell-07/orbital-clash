@@ -17,6 +17,8 @@ export interface PlayerSlot {
   id: PlayerId;
   team: number;
   controller: 'human' | 'script' | 'adaptive' | 'none';
+  /** Index into PLAYER_COLORS; defaults to the player id. */
+  colorIndex?: number;
 }
 
 export interface NewGameOptions {

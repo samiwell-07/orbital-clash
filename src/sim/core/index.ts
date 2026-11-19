@@ -33,7 +33,7 @@ export function createSim(opts: NewGameOptions, extra: Pipeline = []): SimApi {
     step(intents: readonly Intent[]): void {
       const rest: Intent[] = [];
       for (const it of intents) {
-        if (it.t === 'pause') world.paused = !world.paused;
+        if (it.t === 'pause') world.paused = typeof it.on === 'boolean' ? it.on : !world.paused;
         else rest.push(it);
       }
       if (world.paused || world.over) return;

@@ -1,7 +1,8 @@
-import type { CometId, Difficulty, PaletteId, Profile } from '../../types';
+import type { CometId, DeviceFrame, Difficulty, PaletteId, Profile, Seat } from '../../types';
 import type { SaveData } from '../../meta/saveSchema';
 import type { Settings } from '../../meta/settings';
 import type { Ctx } from '../theme';
+import type { NetHooks } from '../../net/types';
 
 /** Campaign area as shown on the map and in the briefing. Provided by the campaign data (screens never import sim code). */
 export interface AreaSummary {
@@ -70,10 +71,10 @@ export interface ResultsProps {
   newBestTime?: boolean;
 }
 
-/** Commands the shell consumes. Everything the UI wants done outside itself. */
+/** Commands the shell consumes. Everything the UI wants done outside itself. `seats` come from the join lobby (P1 first). */
 export type Command =
-  | { t: 'startCampaign'; cometId: CometId; index: number; resurgence: boolean; difficulty: Difficulty; coop: number }
-  | { t: 'startBattle'; setup: BattleConfig }
+  | { t: 'startCampaign'; cometId: CometId; index: number; resurgence: boolean; difficulty: Difficulty; seats: Seat[] }
+  | { t: 'startBattle'; setup: BattleConfig; seats: Seat[] }
   | { t: 'resume' }
   | { t: 'restart' }
   | { t: 'nextArea' }
@@ -100,6 +101,14 @@ export interface UiData {
 
 export interface ScreenCtx {
   data: UiData;
+  /** This frame's per-device input (lobby join/colour/ready). Absent in tests that don't need it. */
+  devices?: () => readonly DeviceFrame[];
+  /** Image of the 3D ship in a palette colour, slowly spinning at `nowSec`; null when unavailable (no WebGL). */
+  shipPreview?: (colorIndex: number, nowSec: number) => CanvasImageSource | null;
+  /** Online room hooks (host/join). Absent in tests that don't need them. */
+  net?: NetHooks;
+  /** Printable characters typed on the keyboard this frame (code entry). */
+  text?: () => string;
 }
 
 /** Screens draw in design space (1920x1080 for 16:9, 1440x1080 for 4:3) over an already painted backdrop. */

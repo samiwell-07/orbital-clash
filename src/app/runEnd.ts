@@ -1,5 +1,5 @@
 import type { SimEvent, World, PlayerId } from '@/types';
-import { PLAYER_COLORS } from '@/types';
+import { ownerColor } from '@/config/playerColors';
 import { campaignResult } from '@/sim/modes/campaign';
 import {
   applyTrophyEvent, boardKey, computeRank, computeScore, drainTrophyNotifications, qualifies, recordAreaComplete,
@@ -25,7 +25,7 @@ export function updateCursors(terrain: TerrainLayer | undefined, session: Sessio
   terrain.setCursors(
     session.spec.humans.map((id: PlayerId) => {
       const sh = w.players[id].ship;
-      return { tx: sh.cursorTx, ty: sh.cursorTy, color: PLAYER_COLORS[id], range: rangeAt(w, sh.cursorTx, sh.cursorTy) };
+      return { tx: sh.cursorTx, ty: sh.cursorTy, color: ownerColor(id), range: rangeAt(w, sh.cursorTx, sh.cursorTy) };
     }),
   );
 }

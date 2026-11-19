@@ -14,8 +14,9 @@ export const VIS: Readonly<Record<UnitKind, number>> = {
   switch: 0.85, thief: 0.8, carrier: 1.2, snake: 1.0, dragon: 0.95,
 };
 
-/** Team silhouette detail: blue smooth shards, red spikes, purple horns, orange fins. */
-export function crest(team: number, y: number, k: number): PartSpec[] {
+/** Team silhouette detail: blue smooth shards, red spikes, purple horns, orange fins (palette 4-7 reuse them in order). */
+export function crest(colorIndex: number, y: number, k: number): PartSpec[] {
+  const team = colorIndex % 4;
   const out: PartSpec[] = [];
   if (team === 0) {
     for (let i = 0; i < 3; i++) out.push({ g: octa(0.18 * k), p: [(0.3 - i * 0.4) * k, y, 0], s: [1.7, 0.8, 0.8], c: W, smooth: true });

@@ -15,6 +15,14 @@ export { createSettingsScreen } from './screens/settings';
 export { createControlsScreen } from './screens/controls';
 export { createLeaderboardsScreen } from './screens/leaderboards';
 export { createTrophiesScreen } from './screens/trophies';
+export { createLobbyScreen } from './screens/lobby';
+export type { LobbyOptions, LobbyScreen } from './screens/lobby';
+export { createJoinOnlineScreen } from './screens/joinOnline';
+export { createRemoteLobbyScreen, ROOM_CLOSED_NOTICE_SEC } from './screens/remoteLobby';
+export { drawLobbyView } from './screens/lobbyDraw';
+export type { LobbyViewLike, LobbyDrawOptions, LobbyOnlineBanner } from './screens/lobbyDraw';
+export { LobbyState, lobbyColorFree, lobbyDeviceLabel, LOBBY_COUNTDOWN_SEC } from './screens/lobbyState';
+export type { LobbyEvent, LobbyRules, LobbySeat } from './screens/lobbyState';
 export type {
   AreaSummary, BattleMapSummary, BattleConfig, BattleSlotConfig, Command, ResultsProps, Screen, ScreenCtx, ScreenResult, UiData, UiNav,
 } from './screens/types';

@@ -69,11 +69,11 @@ export interface Hint {
 }
 
 const KEYS: Record<ControlsDisplay, Record<Hint['key'], string>> = {
-  gamepad: { confirm: 'X', back: 'O', move: 'D-PAD', adjust: '◀ ▶', target: 'L1' },
+  gamepad: { confirm: 'A / ✕', back: 'B / ○', move: 'D-PAD', adjust: '◀ ▶', target: 'LB / L1' },
   keyboard: { confirm: 'ENTER', back: 'BKSP', move: 'ARROWS', adjust: '◀ ▶', target: '[ ]' },
 };
 
-/** Bottom legend (X Select, O Back...) in the device the player prefers. */
+/** Bottom legend (A / ✕ Select, B / ○ Back...) in the device the player prefers; pads show Xbox and PlayStation names. */
 export function drawFooter(ctx: Ctx, h: number, display: ControlsDisplay, hints: readonly Hint[]): void {
   let x = 70;
   const y = h - 46;

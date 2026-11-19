@@ -53,8 +53,10 @@ export function drawPlayerPanel(ctx: Ctx, p: PanelProps): void {
   ctx.save();
   if (!player.alive) ctx.globalAlpha = 0.5;
   const gs = Math.min(r.h - 2 * pad, r.w * 0.28);
+  // Team frame = colour of the team's lowest-id player (lobby colours replace the fixed team palette).
+  const lead = p.world.players.find((q) => q.team === player.team) ?? player;
   drawPlayerGlyph(ctx, { x: r.x + pad, y: r.y + (r.h - gs) / 2, w: gs, h: gs }, player.id, {
-    enemy: !human, team: player.team, alive: player.alive, flash: p.flash,
+    enemy: !human, team: lead.colorIndex, alive: player.alive, flash: p.flash,
   });
   const cx = r.x + pad * 2 + gs;
   const cw = r.x + r.w - pad - cx;

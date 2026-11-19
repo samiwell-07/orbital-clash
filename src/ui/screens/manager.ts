@@ -17,9 +17,9 @@ export interface ScreenManager {
 }
 
 /** Small push/pop screen stack. Screens return pushes/pops; only shell-level Commands are surfaced. */
-export function createScreenManager(getData: () => UiData, root: Screen | null = null): ScreenManager {
+export function createScreenManager(getData: () => UiData, root: Screen | null = null, hooks: Omit<ScreenCtx, 'data'> = {}): ScreenManager {
   const stack: Screen[] = root ? [root] : [];
-  const ctxOf = (): ScreenCtx => ({ data: getData() });
+  const ctxOf = (): ScreenCtx => ({ ...hooks, data: getData() });
 
   return {
     get depth() {
@@ -61,7 +61,7 @@ export function createScreenManager(getData: () => UiData, root: Screen | null =
       ctx.beginPath();
       ctx.rect(0, 0, size.w, size.h);
       ctx.clip();
-      top.draw(ctx, size, nowSec, { data });
+      top.draw(ctx, size, nowSec, { ...hooks, data });
       ctx.restore();
     },
   };

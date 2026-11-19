@@ -13,6 +13,8 @@ export interface CampaignParams {
   difficulty: Difficulty;
   /** 1-3 humans (co-op): one team, each with their own base on map.baseTiles[id] (createWorld places them). */
   humanPlayers?: number;
+  /** Lobby colour (PLAYER_COLORS index) per human, in HUMAN_SLOT_IDS order. */
+  humanColors?: readonly number[];
   seed?: number;
 }
 
@@ -24,7 +26,7 @@ export function scaleCount(n: number, difficulty: Difficulty): number {
 /** NewGameOptions for createSim. Call applyMissionSetup(sim.world) afterwards (the timeline also does it on tick 0). */
 export function startCampaign(p: CampaignParams): NewGameOptions {
   const humans = Math.min(MAX_COOP_PLAYERS, Math.max(1, Math.floor(p.humanPlayers ?? 1)));
-  const humanSlots = HUMAN_SLOT_IDS.slice(0, humans).map((id): PlayerSlot => ({ id, team: 0, controller: 'human' }));
+  const humanSlots = HUMAN_SLOT_IDS.slice(0, humans).map((id, i): PlayerSlot => ({ id, team: 0, controller: 'human', colorIndex: p.humanColors?.[i] }));
   const enemySlot: PlayerSlot = { id: ENEMY_ID, team: 1, controller: 'script' };
   const slots = [...humanSlots, enemySlot].sort((a, b) => a.id - b.id);
   return {

@@ -2,7 +2,7 @@ import type { Player, PlayerId, Structure, World } from '../../src/types';
 
 export function fakePlayer(id: PlayerId, over: Partial<Player> = {}): Player {
   return {
-    id, team: id, controller: 'human', alive: true, thorium: 100, tech: {}, baseTx: 0, baseTy: 0, baseBuilt: true,
+    id, team: id, controller: 'human', colorIndex: id, alive: true, thorium: 100, tech: {}, baseTx: 0, baseTy: 0, baseBuilt: true,
     hits: 10, maxHits: 10, stored: {}, attack: { selected: null, locked: false, targetPlayer: id },
     ship: { x: 1.5, y: 1.5, vx: 0, vy: 0, cursorTx: 1, cursorTy: 1, carrying: 0 },
     stats: { kills: 0, unitsLost: 0, unitsLaunched: 0, thoriumEarned: 0, structuresBuilt: 0, basesDestroyed: 0, penaltySec: 0 },

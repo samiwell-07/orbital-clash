@@ -13,14 +13,17 @@ export interface PadSnapshot {
   /** LX, LY, RX, RY in -1..1 (y down). */
   axes: number[];
   buttons: boolean[];
+  /** Real pads move the ship with the D-pad; keyboards use their pick keys only for menus/attacks. */
+  dpadMoves: boolean;
 }
 
 export function emptySnapshot(): PadSnapshot {
-  return { axes: [0, 0, 0, 0], buttons: new Array<boolean>(PAD_BUTTON_COUNT).fill(false) };
+  return { axes: [0, 0, 0, 0], buttons: new Array<boolean>(PAD_BUTTON_COUNT).fill(false), dpadMoves: false };
 }
 
 export function snapshotGamepad(g: GamepadLike): PadSnapshot {
   const snap = emptySnapshot();
+  snap.dpadMoves = true;
   for (const i of [AXIS.LX, AXIS.LY, AXIS.RX, AXIS.RY]) {
     const v = g.axes[i];
     snap.axes[i] = Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0;

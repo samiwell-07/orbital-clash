@@ -18,6 +18,8 @@ const RINGS = 3;
 const W = 0xffffff;
 const D = 0x4a4e58;
 
+const ownerSlot = (owner: number): number => (owner >= 0 && owner < 4 ? owner | 0 : 0);
+
 interface BaseView {
   b: ViewBuilder;
   rings: GlowRef[];
@@ -61,7 +63,7 @@ export class BaseSystem implements ModelSystem {
   }
 
   update(f: FrameInfo): void {
-    for (const e of f.events) if (e.t === 'baseHit') this.flash[teamIndex(e.target)] = f.now;
+    for (const e of f.events) if (e.t === 'baseHit') this.flash[ownerSlot(e.target)] = f.now;
     const players = f.world.players;
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
@@ -81,11 +83,11 @@ export class BaseSystem implements ModelSystem {
 
   private pose(v: BaseView, p: Player, f: FrameInfo): void {
     const a = this.anim;
-    const idx = teamIndex(p.id);
+    const idx = ownerSlot(p.id);
     v.b.root.position.set(p.baseTx + 0.5, 0, p.baseTy + 0.5);
     const alive = p.alive;
     const flash = clamp01(1 - (f.now - this.flash[idx]) / 0.35);
-    a.t = f.now; a.dt = f.dt; a.team = idx;
+    a.t = f.now; a.dt = f.dt; a.team = teamIndex(p.id);
     a.darken = alive ? 1 : 0.35;
     a.crack = alive ? 0 : 0.5;
     a.flash = flash * 0.5;

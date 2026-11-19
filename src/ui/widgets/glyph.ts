@@ -1,10 +1,11 @@
-import { chamferPath, COLORS, playerColor, rgba, type Ctx } from '../theme';
+import { chamferPath, COLORS, paletteCss, playerColor, rgba, type Ctx } from '../theme';
 import type { Rect } from '../layout';
 import { drawDigits, digitsWidth } from './digits';
 
 export interface GlyphOpts {
   /** AI/enemy: draws a hexagonal flower sigil instead of the player number. */
   enemy?: boolean;
+  /** PLAYER_COLORS index of the team frame (defaults to the player's own colour). */
   team?: number;
   alive?: boolean;
   flash?: number;
@@ -34,7 +35,7 @@ function sigil(ctx: Ctx, cx: number, cy: number, r: number, color: string): void
 /** Square glyph: the player number in the player's colour, framed in the team colour. */
 export function drawPlayerGlyph(ctx: Ctx, r: Rect, player: number, o: GlyphOpts = {}): void {
   const col = playerColor(player);
-  const frame = playerColor(o.team ?? player);
+  const frame = o.team === undefined ? col : paletteCss(o.team);
   chamferPath(ctx, r.x, r.y, r.w, r.h, 8);
   ctx.save();
   ctx.fillStyle = o.enemy ? '#2a0608' : '#0a0d14';

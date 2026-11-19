@@ -19,3 +19,15 @@ export const SUPPORT_DEFS: Readonly<Record<SupportKind, SupportDef>> = {
   gateway: { kind: 'gateway', name: 'Gateway', buildCost: 100, hp: 80, requires: 'gateways', profile: 'both' },
   waypoint: { kind: 'waypoint', name: 'Waypoint', buildCost: 30, hp: 50, requires: 'waypoint', profile: 'both' },
 };
+
+/**
+ * Missile Silo: holds one missile and reloads it over reloadSec (the first load starts when it is placed).
+ * Holding the missile button for chargeSec fires every loaded silo the player owns at the targeted enemy base.
+ */
+export const MISSILE_SILO = {
+  reloadSec: 30,
+  chargeSec: 3,
+  speed: 6,
+  damage: 80,
+  splash: 1.5,
+} as const;

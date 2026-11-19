@@ -1,4 +1,5 @@
 import type { Intent, PlayerId, PlayerUi, StructureKind, UnitKind } from '../types';
+import { MISSILE_SILO } from '../data/support';
 import { AXIS, PAD, TUNING } from './bindings';
 import { applyDeadzone, EdgeDetector, HoldRepeater, stickToIndex, type PadSnapshot } from './gamepad';
 import { PlayerUiMachine, type AttackEvent } from './playerUi';
@@ -28,6 +29,10 @@ export class PlayerController {
   private readonly dirRepeat = DIR_BUTTONS.map(() => new HoldRepeater(TUNING.navDelaySec, TUNING.navRepeatSec, true));
   private holdTile = '';
   private grabbing = false;
+  private missileDown = false;
+  private missileHeld = 0;
+  /** Fired (or interrupted by pause) during this hold: the button must be released before charging again. */
+  private missileSpent = false;
 
   constructor(
     readonly player: PlayerId,
@@ -41,20 +46,24 @@ export class PlayerController {
   /** Pushes intents for this frame into `out`. Returns true when Start was pressed. */
   update(snap: PadSnapshot, dt: number, paused: boolean, out: Intent[]): boolean {
     const e = this.edges.update(snap.buttons);
-    const move = paused ? { x: 0, y: 0 } : applyDeadzone(snap.axes[AXIS.LX], snap.axes[AXIS.LY], TUNING.moveDeadzone);
-    out.push({ t: 'move', player: this.player, ax: move.x, ay: move.y });
     if (paused) {
+      out.push({ t: 'move', player: this.player, ax: 0, ay: 0 });
       this.xHold.reset();
       this.releaseGrab(false, out);
+      this.missileDown = snap.buttons[PAD.L2];
+      this.missileSpent = this.missileDown;
+      this.missileHeld = 0;
       return e.pressed[PAD.START];
     }
 
     const items = this.hooks.getBuildItems(this.player);
     const units = this.hooks.getAttackUnits(this.player);
     this.machine.clampBuild(items.length);
+    const move = this.moveVector(snap, this.machine.menu !== 'build');
+    out.push({ t: 'move', player: this.player, ax: move.x, ay: move.y });
 
-    if (e.pressed[PAD.R1]) this.emitAttack(this.machine.toggleBuild(), out);
-    if (e.pressed[PAD.R3]) this.emitAttack(this.machine.toggleAttack(), out);
+    if (e.pressed[PAD.R1]) this.machine.toggleBuild();
+    if (e.pressed[PAD.R3]) this.machine.toggleAttackDisplay();
     if (e.pressed[PAD.L1]) out.push({ t: 'cycleTarget', player: this.player });
 
     const cur = this.hooks.getCursor(this.player);
@@ -64,7 +73,6 @@ export class PlayerController {
 
     if (e.pressed[PAD.O]) {
       const back = this.machine.back();
-      this.emitAttack(back.events, out);
       if (!back.closed && overStructure) out.push({ t: 'upgrade', player: this.player, tx: cur.tx, ty: cur.ty });
     }
 
@@ -79,18 +87,18 @@ export class PlayerController {
       this.dirRepeat.forEach((r) => r.update(false, dt));
     }
 
-    if (menu === 'attack') {
-      const idx = stickToIndex(snap.axes[AXIS.RX], snap.axes[AXIS.RY], units.length, TUNING.attackTilt);
-      this.emitAttack(this.machine.updateAttack(idx, units, dt), out);
-    }
+    // The right stick attacks at any time except while the build menu has the pick keys (keyboard shares them).
+    const idx = menu === 'build' ? -1 : stickToIndex(snap.axes[AXIS.RX], snap.axes[AXIS.RY], units.length, TUNING.attackTilt);
+    this.emitAttack(this.machine.updateAttack(idx, units, dt), out);
 
     if (menu === 'none') this.freeActions(e, snap, dt, cur, kindAt, overStructure, out);
 
     this.updateGrab(snap, out);
+    this.updateMissile(snap.buttons[PAD.L2], dt, out);
     return e.pressed[PAD.START];
   }
 
-  /** Close menus when the game pauses/resumes; releasing a held attack pushes its intents. */
+  /** Pause/resume closes the build menu; pausing drops an unlocked held attack pick. */
   setPause(on: boolean, out: Intent[]): void {
     this.emitAttack(this.machine.setPause(on), out);
   }
@@ -119,9 +127,45 @@ export class PlayerController {
     for (let i = 0; i < fires && spawn; i++) out.push({ t: 'cycleOutput', player: p, tx, ty });
   }
 
-  /** Grab every frame while L2/R2 is held (the sim picks up a nearby rock); drop on release. */
+  /** Left stick (analog); a real pad's D-pad moves at full speed when the stick is idle and no build menu is open. */
+  private moveVector(snap: PadSnapshot, dpadAllowed: boolean): { x: number; y: number } {
+    const stick = applyDeadzone(snap.axes[AXIS.LX], snap.axes[AXIS.LY], TUNING.moveDeadzone);
+    if (stick.x !== 0 || stick.y !== 0 || !snap.dpadMoves || !dpadAllowed) return stick;
+    const b = snap.buttons;
+    const x = (b[PAD.RIGHT] ? 1 : 0) - (b[PAD.LEFT] ? 1 : 0);
+    const y = (b[PAD.DOWN] ? 1 : 0) - (b[PAD.UP] ? 1 : 0);
+    const k = x !== 0 && y !== 0 ? Math.SQRT1_2 : 1;
+    return { x: x * k, y: y * k };
+  }
+
+  /** Hold the missile button for MISSILE_SILO.chargeSec to fire; releasing earlier cancels. One shot per hold. */
+  private updateMissile(down: boolean, dt: number, out: Intent[]): void {
+    const ui = this.machine.state;
+    if (!down) {
+      this.missileDown = false;
+      this.missileSpent = false;
+      this.missileHeld = 0;
+      ui.missileCharge = 0;
+      return;
+    }
+    this.missileHeld = this.missileDown ? this.missileHeld + dt : 0;
+    this.missileDown = true;
+    if (this.missileSpent) {
+      ui.missileCharge = 0;
+      return;
+    }
+    if (this.missileHeld + 1e-9 >= MISSILE_SILO.chargeSec) {
+      out.push({ t: 'fireMissile', player: this.player });
+      this.missileSpent = true;
+      ui.missileCharge = 0;
+    } else {
+      ui.missileCharge = this.missileHeld / MISSILE_SILO.chargeSec;
+    }
+  }
+
+  /** Grab every frame while RT/R2 is held (the sim picks up a nearby rock); drop on release. */
   private updateGrab(snap: PadSnapshot, out: Intent[]): void {
-    const held = snap.buttons[PAD.L2] || snap.buttons[PAD.R2];
+    const held = snap.buttons[PAD.R2];
     if (held) out.push({ t: 'grab', player: this.player });
     this.releaseGrab(held, out);
   }

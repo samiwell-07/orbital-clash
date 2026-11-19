@@ -3,7 +3,7 @@ import type { VideoLayout } from '../../meta/settings';
 import { buildItemsFor } from '../menus/buildItems';
 import { attackSlotsFor, targetCandidates } from '../menus/attackUnits';
 import { drawBuildMenu } from '../menus/buildMenu';
-import { drawAttackMenu } from '../menus/attackMenu';
+import { drawAttackMenu, drawMissileCharge } from '../menus/attackMenu';
 import { PauseMenu } from '../menus/pauseMenu';
 import type { Command } from '../screens/types';
 import { autoMode, clampRect, computeHudLayout, fitProjection, type HudLayout, type Rect } from '../layout';
@@ -21,6 +21,8 @@ export interface HudOptions {
   /** Tile -> canvas pixel projection from the renderer camera; defaults to the map fitted into the play area. */
   project?: (x: number, y: number) => { x: number; y: number } | null;
   controlsDisplay?: () => 'gamepad' | 'keyboard';
+  /** Extra warning on the pause overlay (e.g. a disconnected controller). */
+  pauseNotice?: () => string | null;
 }
 
 export interface Hud extends HudApi {
@@ -71,9 +73,10 @@ export function createHud(opts: HudOptions = {}): Hud {
       if (p.controller !== 'human' || !p.alive) continue;
       const ui = input.ui(p.id);
       const ship = project(p.ship.x, p.ship.y);
+      if (ui.missileCharge > 0) drawMissileCharge(ctx, ship, ui.missileCharge, layout.s);
       if (ui.menu === 'build') {
         drawBuildMenu(ctx, ship, bounds, buildItemsFor(world, p.id), ui.buildIndex, p.id, layout.s, now);
-      } else if (ui.menu === 'attack') {
+      } else if (ui.attackShown) {
         const origin = p.baseBuilt ? project(p.baseTx + 0.5, p.baseTy + 0.5) : ship;
         const enemies = targetCandidates(world, p.id);
         drawAttackMenu(ctx, origin, bounds, {
@@ -149,7 +152,7 @@ export function createHud(opts: HudOptions = {}): Hud {
       } else {
         const cmd = pause.update(input.nav(), dt);
         if (cmd) pending = cmd;
-        pause.draw(ctx, { x: 0, y: 0, w, h }, s, nowSec, opts.controlsDisplay?.() ?? 'gamepad');
+        pause.draw(ctx, { x: 0, y: 0, w, h }, s, nowSec, opts.controlsDisplay?.() ?? 'gamepad', opts.pauseNotice?.() ?? null);
       }
       wasPaused = paused;
     },

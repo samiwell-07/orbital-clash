@@ -1,11 +1,12 @@
 import { PLAYER_COLORS } from '@/types';
 import type { UnitKind } from '@/types';
+import { PALETTE_SIZE, colorIndexFor } from '@/config/playerColors';
 
-/** Crowd body colour per team (style-guide section 6). */
-export const TEAM_BODY: readonly number[] = [0x2a9fd8, 0xc0222b, 0x9b44e6, 0xffc21a];
-/** Highlight / spike-tip colour per team. */
-export const TEAM_GLINT: readonly number[] = [0x8fe8ff, 0xf0f0f0, 0xe9d6ff, 0xff7a1a];
-/** Emissive accent colour per team (== PLAYER_COLORS). */
+/** Crowd body colour per palette index (style-guide section 6): blue, red, purple, orange, green, cyan, pink, white. */
+export const TEAM_BODY: readonly number[] = [0x2a9fd8, 0xc0222b, 0x9b44e6, 0xffc21a, 0x24b85a, 0x1fb8c4, 0xd8409e, 0xc8ccd4];
+/** Highlight / spike-tip colour per palette index. */
+export const TEAM_GLINT: readonly number[] = [0x8fe8ff, 0xf0f0f0, 0xe9d6ff, 0xff7a1a, 0xc8ffd8, 0xd0ffff, 0xffd0ee, 0x9fe0ff];
+/** Emissive accent colour per palette index (== PLAYER_COLORS). */
 export const TEAM_GLOW: readonly number[] = PLAYER_COLORS;
 
 export const UNIT_ICON_COLORS: Readonly<Record<UnitKind, number>> = {
@@ -26,8 +27,14 @@ export const UNIT_TINT: Readonly<Partial<Record<UnitKind, readonly [number, numb
 export const LASER_COLOR_LO = 0x4dd8ff;
 export const LASER_COLOR_HI = 0xff4dd2;
 
+/** Palette index (0..PALETTE_SIZE-1) of an owner's chosen colour; out-of-range owners give 0. */
 export function teamIndex(owner: number): number {
-  return owner >= 0 && owner < 4 ? owner | 0 : 0;
+  return colorIndexFor(owner);
+}
+
+/** Clamps an already-resolved palette index into the tables (does NOT go through the owner map). */
+export function paletteIndex(index: number): number {
+  return index >= 0 && index < PALETTE_SIZE ? index | 0 : 0;
 }
 
 export function unitTint(kind: UnitKind): readonly [number, number, number] {

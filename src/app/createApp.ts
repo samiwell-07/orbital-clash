@@ -10,9 +10,14 @@ import { createHud, createScreenManager, createTitleScreen, createResultsScreen,
 import { missionSummaries } from '@/data/areas';
 import { battleMapSummaries } from '@/data/battle-maps';
 import { createInput, type InputController } from '@/input';
+import { createShipPreview, type ShipPreview } from '@/render/preview';
+import { resetPlayerColorMap, setPlayerColorMap } from '@/config/playerColors';
 import { registerAllSystems } from './registerSystems';
 import { buildRun, type StartCommand } from './runSpec';
 import { createSession, type Session } from './session';
+import { createNetSession } from './netSession';
+import { createRoom } from '@/net/room';
+import type { NetEvent, NetHooks, NetRoom } from '@/net/types';
 import { feedTrophies, finishRun, submitToBoard, updateCursors } from './runEnd';
 
 const MAX_FRAME = 0.1;
@@ -37,9 +42,61 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
   let noticeUntil = 0;
 
   const ctx = hudCanvas.getContext('2d')!;
+  /** Lazily built 3D ship for the lobby; undefined = not tried yet, null = WebGL unavailable. */
+  let preview: ShipPreview | null | undefined;
   const menuInput: InputController = createInput({
     players: [0], getBuildItems: () => [], getAttackUnits: () => [], getCursor: () => ({ tx: 0, ty: 0 }),
   });
+
+  /** Online room this machine is in (host or client), if any. */
+  let room: NetRoom | null = null;
+  /** The room the running session plays through (null = offline). */
+  let sessionRoom: NetRoom | null = null;
+  let roomUnsub: (() => void) | null = null;
+  /** Printable characters typed since the last frame (join-code entry). */
+  let typed = '';
+  let typedThisFrame = '';
+
+  const net: NetHooks = {
+    room: () => room,
+    host: () => {
+      if (room && room.role === 'host' && room.status !== 'closed') return;
+      openRoom(createRoom({ host: true }));
+    },
+    join: (code) => openRoom(createRoom({ join: code })),
+    leave: () => closeRoom(),
+  };
+
+  function openRoom(r: NetRoom): void {
+    closeRoom();
+    room = r;
+    roomUnsub = r.listen((e) => onNet(r, e));
+  }
+
+  /** Leaves the room; a host first tells everyone it is closed. */
+  function closeRoom(): void {
+    const r = room;
+    if (!r) return;
+    room = null;
+    roomUnsub?.();
+    roomUnsub = null;
+    if (r.role === 'host' && r.status === 'open') r.send({ t: 'closed' });
+    r.close();
+  }
+
+  function onNet(r: NetRoom, e: NetEvent): void {
+    if (r !== room || r.role !== 'client') return;
+    if (e.t === 'msg' && e.from === 0) {
+      if (e.data.t === 'start') startOnline(e.data.cmd, e.data.difficulty, e.data.seed);
+      else if (e.data.t === 'closed' && phase !== 'menu') {
+        closeRoom();
+        toTitle();
+        showNotice('The host closed the room.');
+      }
+    } else if (e.t === 'peerLeft' && e.peer === 0 && phase !== 'menu') {
+      showNotice('The host left: restart is not available.');
+    }
+  }
 
   const data = (): UiData => ({
     save,
@@ -51,7 +108,15 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
       id: m.id, name: m.name, thoriumLevel: m.thoriumLevel, palette: m.palette, maxPlayers: m.maxPlayers,
     })),
   });
-  const screens = createScreenManager(data, createTitleScreen());
+  const screens = createScreenManager(data, createTitleScreen(), {
+    devices: () => menuInput.devices(),
+    shipPreview: (colorIndex, nowSec) => {
+      if (preview === undefined) preview = createShipPreview();
+      return preview?.render(colorIndex, nowSec) ?? null;
+    },
+    net,
+    text: () => typedThisFrame,
+  });
   let hud: Hud = makeHud();
 
   function makeHud(): Hud {
@@ -59,6 +124,7 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
       layout: () => save.settings.videoLayout,
       project: (x, y) => (renderer ? worldToScreen(renderer.getView(), x, y) : null),
       controlsDisplay: () => save.settings.controlsDisplay,
+      pauseNotice: () => session?.pauseNotice() ?? null,
     });
   }
 
@@ -86,25 +152,62 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
     return renderer;
   }
 
+  function hosting(): NetRoom | null {
+    return room && room.role === 'host' && room.status === 'open' ? room : null;
+  }
+
   function start(cmd: StartCommand): void {
-    const spec = buildRun(cmd, save.settings.defaultDifficulty as Difficulty);
+    const difficulty = save.settings.defaultDifficulty as Difficulty;
+    const host = hosting();
+    if (!host) {
+      // A room that failed or is still connecting must not stay attached to an offline match.
+      closeRoom();
+      launch(buildRun(cmd, difficulty), null);
+      return;
+    }
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const spec = buildRun(cmd, difficulty, seed);
     if (typeof spec === 'string') return showNotice(spec);
+    if (!ensureRenderer()) return;
+    host.send({ t: 'start', cmd, difficulty, seed });
+    launch(spec, host, seed);
+  }
+
+  function startOnline(cmd: StartCommand, difficulty: Difficulty, seed: number): void {
+    // Leaving frees the others' lockstep (peerLeft) instead of making them wait for us forever.
+    if (room && !launch(buildRun(cmd, difficulty, seed), room, seed)) closeRoom();
+  }
+
+  function launch(spec: ReturnType<typeof buildRun>, online: NetRoom | null, match = 0): boolean {
+    if (typeof spec === 'string') {
+      showNotice(spec);
+      return false;
+    }
     const r = ensureRenderer();
-    if (!r) return;
+    if (!r) return false;
     session?.dispose();
-    session = createSession(spec);
+    session = online ? createNetSession(spec, online, {}, { match }) : createSession(spec);
+    sessionRoom = online;
+    preview?.dispose();
+    preview = undefined;
+    setPlayerColorMap(session.sim.world.players.map((p) => p.colorIndex));
     r.load(session.sim.world);
-    save = { ...save, trophies: { ...save.trophies, localPlayers: [...spec.humans] } };
+    const local = online ? spec.bindings.filter((b) => b.peer === online.me).map((b) => b.player) : spec.humans;
+    save = { ...save, trophies: { ...save.trophies, localPlayers: [...local] } };
     hud = makeHud();
     screens.reset(null);
     phase = 'playing';
     audio.unlock();
     audio.music('game');
+    return true;
   }
 
   function toTitle(): void {
+    closeRoom();
     session?.dispose();
     session = null;
+    sessionRoom = null;
+    resetPlayerColorMap();
     phase = 'menu';
     hud.reset();
     screens.reset(createTitleScreen());
@@ -126,12 +229,14 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
       case 'resume': {
         if (!session) return;
         const intents = session.input.setPaused(false);
-        session.sim.step(intents);
+        session.submit(intents);
         return;
       }
       case 'restart':
+        if (room && !hosting()) return showNotice('Only the host can restart.');
         return session ? start(session.spec.command) : undefined;
       case 'nextArea': {
+        if (room && !hosting()) return showNotice('Waiting for the host to continue…');
         const n = nextAreaCommand();
         return n ? start(n) : toTitle();
       }
@@ -170,6 +275,7 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
     save = feedTrophies(save, events, now);
     ctx.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
     hud.draw(ctx, world, s.input, now);
+    drawBanner(s.banner());
     handle(hud.takeCommand());
     if (world.over && phase === 'playing' && session) {
       const done = finishRun(session, save);
@@ -180,10 +286,40 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
     }
   }
 
+  function drawBanner(text: string | null): void {
+    if (!text) return;
+    ctx.save();
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    const w = ctx.measureText(text).width + 40;
+    const x = hudCanvas.width / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(x - w / 2, 56, w, 40);
+    ctx.fillStyle = '#ffd36b';
+    ctx.fillText(text, x, 84);
+    ctx.restore();
+  }
+
+  /** Online housekeeping once per frame: connection loss in a match, leftover rooms back at the title. */
+  function checkRoom(): void {
+    if (!room) return;
+    if (phase !== 'menu' && sessionRoom === room && room.status === 'closed') {
+      const why = room.error ?? 'Connection lost';
+      closeRoom();
+      toTitle();
+      showNotice(`Online game ended: ${why}.`);
+    } else if (phase === 'menu' && screens.depth <= 1) {
+      closeRoom();
+    }
+  }
+
   function frame(t: number): void {
     const now = t / 1000;
     const dt = Math.min(MAX_FRAME, (t - last) / 1000);
     last = t;
+    typedThisFrame = typed;
+    typed = '';
+    checkRoom();
     if (phase === 'playing' && session) playingFrame(dt, now);
     else {
       if (phase === 'results' && session && renderer) {
@@ -212,6 +348,10 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
   window.addEventListener('resize', () => resize());
   window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
   window.addEventListener('keydown', () => audio.unlock(), { once: true });
+  window.addEventListener('keydown', (e) => {
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) typed += e.key;
+  });
+  window.addEventListener('beforeunload', () => closeRoom());
   resize(null);
   applySettings();
   audio.music('menu');

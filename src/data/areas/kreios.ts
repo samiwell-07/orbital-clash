@@ -6,12 +6,12 @@ const SPECS: readonly AreaSpec[] = [
   {
     name: 'First Impact', hits: 5, start: 300, par: 240, ai: 1,
     map: { w: 30, h: 20, style: 'plain', seed: 101, thorium: 2, rocks: 10 },
-    hints: ['Open the build menu with R1/E and drop Turrets on the path to your base.', 'Grab rocks and drag them to a Turret to smash them for Thorium.', 'Build a Basic Ops tower, then open the attack menu to send Scouts at the alien base.'],
+    hints: ['Open the build menu (R1 / Shift) and place Turrets (X / E) on the path to your base.', 'Build a Harvester, then grab rocks with your ship (L2 / G) and drop them inside its magnet for Thorium.', 'Build a Basic Ops tower, then open the attack menu (R3 / Space) to send Scouts at the alien base.'],
   },
   {
     name: 'Rock Fall', hits: 8, start: 300, par: 300, ai: 1,
     map: { w: 30, h: 20, style: 'plain', layout: 'side', seed: 102, thorium: 3, rocks: 24, craters: 8 },
-    hints: ['Meteoroids keep falling: smash them with Turrets and Lasers to fund your army.', 'Lasers hit ground and air and smash rocks; place one near the rock lanes.'],
+    hints: ['Meteoroids keep falling: feed them to your Harvesters to fund your army.', 'Upgrade a Harvester to widen its magnet; big rocks take longer but pay much more.'],
   },
   {
     name: 'Crossroads', hits: 10, start: 300, par: 360, ai: 2,
@@ -28,7 +28,7 @@ const SPECS: readonly AreaSpec[] = [
   {
     name: 'Hammer Time', hits: 15, start: 340, par: 420, ai: 3,
     map: { w: 36, h: 24, style: 'spires', seed: 105, thorium: 2, rocks: 16 },
-    hints: ['Special Ops towers build Hammers: slow, heavy siege units that crush structures.', 'Hold the build button on a tower to cycle its output.'],
+    hints: ['Special Ops towers build Hammers: slow, heavy siege units that crush structures.', 'Hold the build button (X / E) on a spawn tower to cycle its output.'],
   },
   {
     name: 'Pressure Point', hits: 15, start: 340, par: 420, ai: 3,

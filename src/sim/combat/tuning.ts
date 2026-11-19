@@ -11,6 +11,3 @@ export const SHOT_SLACK = 0.5;
 export const IMPACT_FUSE = 0.6;
 export const MISSILE_BASE_HITS = 3;
 export const TORPEDO_BASE_HITS = 2;
-/** Radius used to hit drifting rocks (tiles) = ROCK_RADIUS_BASE + size * ROCK_RADIUS_PER_SIZE. */
-export const ROCK_RADIUS_BASE = 0.3;
-export const ROCK_RADIUS_PER_SIZE = 0.2;

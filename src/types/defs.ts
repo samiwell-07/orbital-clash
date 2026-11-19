@@ -36,8 +36,6 @@ export interface WeaponDef {
   damage: readonly number[];
   cooldown: readonly number[];
   splash: number;
-  /** Can smash drifting rocks to release Thorium (Turret, Laser, Bomber). */
-  smashesRocks: boolean;
   requires: string | null;
 }
 
@@ -62,6 +60,9 @@ export interface SupportDef {
   hp: number;
   requires: string | null;
   profile: 'base' | 'bionic' | 'both';
+  /** Upgradeable support structures only (e.g. Harvester); absent means 0 / none. */
+  maxLevel?: number;
+  upgradeCost?: readonly number[];
 }
 
 export interface ResearchDef {
@@ -69,6 +70,8 @@ export interface ResearchDef {
   name: string;
   description: string;
   cost: number;
+  /** Bionic Swarm research: bought at a Research Lab in Bionic battles, never granted by campaign or base tech. */
+  bionic?: boolean;
 }
 
 export type Tech = Readonly<Record<string, boolean>>;

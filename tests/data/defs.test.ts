@@ -3,7 +3,7 @@ import { RECYCLE_FULL, REPAIR_FULL } from '../../src/config/constants';
 import { ALL_UNITS, WEAPONS } from '../../src/types';
 import type { StructureKind } from '../../src/types';
 import {
-  ALL_TECH_KEYS, DEFS, RESEARCH_DEFS, SPAWN_TOWER_DEFS, SUPPORT_DEFS, TECH_STRUCTURES, TECH_UNITS, TECH_WEAPONS,
+  ALL_TECH_KEYS, BIONIC_TECH_KEYS, DEFS, RESEARCH_DEFS, SPAWN_TOWER_DEFS, SUPPORT_DEFS, TECH_STRUCTURES, TECH_UNITS, TECH_WEAPONS,
   UNIT_DEFS, WEAPON_DEFS, allTech, createDefs, isUnlocked,
 } from '../../src/data';
 
@@ -66,12 +66,11 @@ describe('weapons', () => {
       }
     }
   });
-  it('documents target layers and rock smashing', () => {
+  it('documents target layers', () => {
     expect(WEAPON_DEFS.turret.targets).toBe('ground');
     expect(WEAPON_DEFS.laser.targets).toBe('both');
     expect(WEAPON_DEFS.pulsar.targets).toBe('both');
     expect(WEAPON_DEFS.bomber.targets).toBe('air');
-    expect(WEAPONS.filter((k) => WEAPON_DEFS[k].smashesRocks)).toEqual(['turret', 'laser', 'bomber']);
   });
 });
 
@@ -107,12 +106,14 @@ describe('spawn towers and support', () => {
 });
 
 describe('research', () => {
-  it('contains exactly the campaign keys', () => {
+  it('contains exactly the campaign keys, with Bionic research kept apart', () => {
     expect([...ALL_TECH_KEYS].sort()).toEqual([...CAMPAIGN_KEYS].sort());
+    expect([...BIONIC_TECH_KEYS].sort()).toEqual(['dragonSwarm', 'missileDefense', 'missileSilo', 'snakeSwarm']);
     expect(RESEARCH_DEFS.every((r) => r.cost > 0)).toBe(true);
+    expect(Object.keys(allTech()).sort()).toEqual([...ALL_TECH_KEYS].sort());
   });
   it('every `requires` key and tech mapping resolves', () => {
-    const keys = new Set(ALL_TECH_KEYS);
+    const keys = new Set(RESEARCH_DEFS.map((r) => r.key));
     for (const k of ALL_UNITS) {
       const r = UNIT_DEFS[k].requires;
       if (r !== null) expect(keys.has(r)).toBe(true);

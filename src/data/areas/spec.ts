@@ -120,7 +120,8 @@ export function makeMission(comet: CometId, index: number, spec: AreaSpec, resur
   const map = makeMap({ ...spec.map, id: `campaign-${id}`, name: spec.name, palette: comet });
   const layout = new Layout(map);
   const enemyTech = new Set([...unlocked, ...(teaches ? [teaches] : []), ...(spec.extraTech ?? [])]);
-  const alien = [...(teaches ? [teaches] : []), ...(spec.extraTech ?? [])];
+  // `teaches` is granted to every player by createWorld; the script only unlocks the enemy's extra alien tech.
+  const alien = [...(spec.extraTech ?? [])];
   const script = buildScript(comet, spec, enemyTech, alien, layout, resurgence);
   const m = DIFFICULTY_MULT;
   const hit = (mult: number) => Math.min(100, Math.max(1, Math.round(spec.hits * mult)));

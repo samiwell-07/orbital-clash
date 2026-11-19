@@ -1,5 +1,6 @@
 import type { Intent, NewGameOptions, PlayerId, StructureKind, World } from '@/types';
 import { DEFS, UNIT_DEFS, isUnlocked } from '@/data';
+import { structureInfo } from '@/sim/build/info';
 import { addStructure, structureAt } from '@/sim/core/entities';
 import { isBlocked } from '@/sim/core/grid';
 import { pathExists, wouldBlockPath } from '@/sim/core/flow';
@@ -61,9 +62,8 @@ export function applyIntent(w: World, it: Intent, out: Applied): void {
     const s = structureAt(w, it.tx, it.ty);
     const p = w.players[it.player];
     if (!s || s.owner !== it.player) return bad('nothing to upgrade');
-    const weapon = ['turret', 'laser', 'pulsar', 'bomber'].includes(s.kind);
-    const def = weapon ? DEFS.weapon(s.kind as 'turret') : DEFS.spawnTower(s.kind as 'basicOps');
-    if (s.level >= def.maxLevel) return bad('max level');
+    const def = structureInfo(s.kind);
+    if (!def || s.level >= def.maxLevel) return bad('max level');
     const c = def.upgradeCost[s.level];
     if (p.thorium < c) return bad(`overspend upgrade ${c} > ${p.thorium}`);
     p.thorium -= c;

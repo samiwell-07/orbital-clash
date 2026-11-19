@@ -9,7 +9,7 @@ export interface Tile {
 
 /**
  * Tracks occupied tiles while an area script is authored, so every authored structure sits on free
- * floor, keeps spacing and never seals a base away from the other.
+ * floor, keeps spacing and never seals any base (including the co-op partner bases) away from the others.
  */
 export class Layout {
   readonly grid: Grid;
@@ -27,6 +27,11 @@ export class Layout {
     return this.map.baseTiles[1] as Tile;
   }
 
+  /** Every base tile on the map (human, enemy and co-op partner spots); never claimed, always kept reachable. */
+  get bases(): Tile[] {
+    return this.map.baseTiles.filter((t): t is Tile => t !== null);
+  }
+
   private floor(t: Tile): boolean {
     return inBounds(this.grid, t.tx, t.ty) && this.grid.terrain[t.ty * this.grid.w + t.tx] === 0;
   }
@@ -39,13 +44,13 @@ export class Layout {
 
   private connected(): boolean {
     const seen = reachableFrom(this.grid, this.human.tx, this.human.ty);
-    return this.touches(seen, this.enemy) && this.placed.every((t) => this.touches(seen, t));
+    return this.bases.every((t) => this.touches(seen, t)) && this.placed.every((t) => this.touches(seen, t));
   }
 
   /** Occupies a tile (used for preplaced and scripted structures). Returns false if it is unusable or would seal a path. */
   claim(t: Tile): boolean {
     if (!this.floor(t) || this.grid.occupant[t.ty * this.grid.w + t.tx] !== 0) return false;
-    if ((t.tx === this.human.tx && t.ty === this.human.ty) || (t.tx === this.enemy.tx && t.ty === this.enemy.ty)) return false;
+    if (this.bases.some((b) => b.tx === t.tx && b.ty === t.ty)) return false;
     occupy(this.grid, t.tx, t.ty, this.nextId++);
     this.placed.push(t);
     if (this.connected()) return true;

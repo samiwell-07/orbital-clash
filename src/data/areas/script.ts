@@ -25,7 +25,8 @@ function costs(kind: StructureKind): { build: number; up: readonly number[] } {
     const d = WEAPON_DEFS[kind as keyof typeof WEAPON_DEFS];
     return { build: d.buildCost, up: d.upgradeCost };
   }
-  return { build: SUPPORT_DEFS[kind as keyof typeof SUPPORT_DEFS].buildCost, up: [] };
+  const d = SUPPORT_DEFS[kind as keyof typeof SUPPORT_DEFS];
+  return { build: d.buildCost, up: d.upgradeCost ?? [] };
 }
 
 function defaultOutput(kind: StructureKind, output?: UnitKind): UnitKind | null {

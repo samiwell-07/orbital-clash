@@ -31,3 +31,37 @@ export function hathorOasis(): MapDef {
   scatter(c, rnd, 4, { x0: 4, y0: 3, x1: 15, y1: 12 }, 'o', 1);
   return finish(c, { id, name: 'Hathor Oasis', palette: 'hathor', thoriumLevel: 3, rockCount: 16, bases });
 }
+
+/** 44x30, four starts separated by tall mesas; a strip of sinkholes and rock clusters guard the centre. */
+export function hathorMesa(): MapDef {
+  const id = 'battle-hathor-mesa';
+  const c = canvas(44, 30, 'mirror4');
+  const bases = corners(44, 30, 6, 5);
+  const rnd = rngFor(id);
+  rim(c, 1, 4);
+  box(c, 13, 3, 16, 9, '#');
+  box(c, 3, 11, 9, 12, '#');
+  line(c, 11, 14, 15, 14, 'o');
+  for (const [x, y] of [[20, 9], [17, 12]]) box(c, x, y, x + 1, y + 1, '#');
+  scatter(c, rnd, 5, { x0: 17, y0: 2, x1: 21, y1: 7 }, '#', 1);
+  scatter(c, rnd, 3, { x0: 9, y0: 8, x1: 13, y1: 12 }, 'o', 1);
+  clearZone(c, bases, 3);
+  return finish(c, { id, name: 'Hathor Mesa', palette: 'hathor', thoriumLevel: 3, rockCount: 13, bases });
+}
+
+/** 48x24, two players: canyon walls split three long lanes, each wall broken by three staggered gaps. */
+export function hathorCanyon(): MapDef {
+  const id = 'battle-hathor-canyon';
+  const c = canvas(48, 24, 'rot2');
+  const bases = [{ tx: 5, ty: 12 }, { tx: 42, ty: 11 }];
+  const rnd = rngFor(id);
+  rim(c, 1, 4);
+  box(c, 10, 6, 37, 7, '#');
+  for (const x of [16, 23, 30]) box(c, x, 6, x + 1, 7, '.');
+  box(c, 20, 10, 21, 11, '#');
+  line(c, 13, 14, 15, 14, 'o');
+  scatter(c, rnd, 6, { x0: 10, y0: 2, x1: 38, y1: 4 }, '#', 2);
+  scatter(c, rnd, 3, { x0: 12, y0: 9, x1: 34, y1: 13 }, 'o', 1);
+  clearZone(c, bases, 3);
+  return finish(c, { id, name: 'Hathor Canyon', palette: 'hathor', thoriumLevel: 2, rockCount: 11, bases });
+}

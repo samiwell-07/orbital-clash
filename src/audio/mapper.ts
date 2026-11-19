@@ -1,5 +1,5 @@
 // Pure mapping from SimEvents to sound calls (id, pan, volume). Collapses crowds into few calls.
-import type { SimEvent, UnitKind } from '../types';
+import type { PlayerId, SimEvent, UnitKind } from '../types';
 import { MAP_W } from '../config/constants';
 import { SOUND_META } from './sound-ids';
 import type { SoundId, SoundCall } from './sound-ids';
@@ -24,14 +24,17 @@ const LAUNCH_SOUND: Partial<Record<UnitKind, SoundId>> = {
 const SHOT_SOUND = { laser: 'laserBeam', pulsar: 'pulsarPulse', bomber: 'bomberBomb' } as const;
 
 type Hit = [id: SoundId, pan: number, vol: number];
+/** Whether a player is human; alien tech unlocks stay silent. Default: everyone counts as human. */
+export type IsHuman = (owner: PlayerId) => boolean;
+const everyone: IsHuman = () => true;
 
 /** Single event -> zero or more sounds. */
-export function soundsForEvent(e: SimEvent): Hit[] {
+export function soundsForEvent(e: SimEvent, isHuman: IsHuman = everyone): Hit[] {
   switch (e.t) {
     case 'structureBuilt': return [['build', panFromX(e.tx), 1]];
     case 'baseBuilt': return [['build', panFromX(e.tx), 1.1]];
     case 'structureUpgraded': return [['upgrade', 0, 1]];
-    case 'techUnlocked': return [['upgrade', 0, 0.8]];
+    case 'techUnlocked': return isHuman(e.owner) ? [['upgrade', 0, 0.8]] : [];
     case 'structureRecycled': return [['recycle', 0, 1]];
     case 'structureRepaired': return [['repair', 0, 1]];
     case 'structureHit': return [['structureHit', panFromX(e.x), 0.7]];
@@ -63,10 +66,10 @@ export function soundsForEvent(e: SimEvent): Hit[] {
 interface Acc { id: SoundId; panSum: number; vol: number; count: number }
 
 /** Map a whole frame of events. Same sound at a similar pan becomes one call with a louder-by-log volume. */
-export function mapEvents(events: readonly SimEvent[]): SoundCall[] {
+export function mapEvents(events: readonly SimEvent[], isHuman: IsHuman = everyone): SoundCall[] {
   const acc = new Map<string, Acc>();
   for (const e of events) {
-    for (const [id, pan, vol] of soundsForEvent(e)) {
+    for (const [id, pan, vol] of soundsForEvent(e, isHuman)) {
       const key = `${id}|${Math.round(pan * 2)}`;
       const a = acc.get(key);
       if (a) {
@@ -86,7 +89,7 @@ export function mapEvents(events: readonly SimEvent[]): SoundCall[] {
   return calls.slice(0, MAX_CALLS_PER_BATCH);
 }
 
-export function handleEvents(events: readonly SimEvent[], play: (call: SoundCall) => void): void {
+export function handleEvents(events: readonly SimEvent[], play: (call: SoundCall) => void, isHuman: IsHuman = everyone): void {
   if (events.length === 0) return;
-  for (const call of mapEvents(events)) play(call);
+  for (const call of mapEvents(events, isHuman)) play(call);
 }

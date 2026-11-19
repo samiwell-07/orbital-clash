@@ -68,7 +68,8 @@ export interface Projectile {
   layerMask: 'ground' | 'air' | 'both';
 }
 
-export type RockState = 'drifting' | 'grabbed' | 'landed' | 'smashed';
+/** 'harvesting' = held by a Harvester's magnet (pulled in, then drained); ships cannot grab it. */
+export type RockState = 'drifting' | 'grabbed' | 'landed' | 'harvesting' | 'smashed';
 
 export interface Rock {
   id: EntityId;

@@ -42,7 +42,8 @@ export interface RendererApi {
 
 export interface AudioApi {
   unlock(): void;
-  handle(events: readonly SimEvent[]): void;
+  /** isHuman (default: everyone) keeps alien-owned tech unlocks silent. */
+  handle(events: readonly SimEvent[], isHuman?: (owner: PlayerId) => boolean): void;
   music(mode: 'menu' | 'game' | 'off'): void;
   setVolume(master: number, sfx: number, music: number): void;
 }

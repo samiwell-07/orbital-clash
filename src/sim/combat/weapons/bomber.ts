@@ -4,7 +4,7 @@ import { addProjectile } from '@/sim/core';
 import { BOMB_SPEED, SHOT_SLACK } from '../tuning';
 import { structureCenter, type Target } from '../targeting';
 
-/** Anti-air flak: homing bomb with splash that only damages air units (and smashes rocks it targets). */
+/** Anti-air flak: homing bomb with splash that only damages air units. */
 export function fire(w: World, s: Structure, target: Target, level: number, emit: Emit): void {
   const def = WEAPON_DEFS.bomber;
   const { x, y } = structureCenter(s);

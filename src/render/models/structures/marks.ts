@@ -1,4 +1,4 @@
-import { SPAWN_TOWER_DEFS, WEAPON_DEFS } from '@/data';
+import { SPAWN_TOWER_DEFS, SUPPORT_DEFS, WEAPON_DEFS } from '@/data';
 import type { StructureKind } from '@/types';
 
 export const GROWN_VARIANT = 4;
@@ -27,5 +27,7 @@ export function platformVariant(level: number, maxLevel: number): number {
 export function maxLevelOf(kind: StructureKind): number {
   if (kind === 'basicOps' || kind === 'specialOps') return SPAWN_TOWER_DEFS[kind].maxLevel;
   const w = (WEAPON_DEFS as Record<string, { maxLevel: number } | undefined>)[kind];
-  return w ? w.maxLevel : 0;
+  if (w) return w.maxLevel;
+  const s = (SUPPORT_DEFS as Record<string, { maxLevel?: number } | undefined>)[kind];
+  return s?.maxLevel ?? 0;
 }

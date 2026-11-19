@@ -97,6 +97,15 @@ describe('MessageFeed', () => {
     expect(feed.hitFlash(1, 6)).toBe(0);
     expect(feed.hitFlash(2, 5)).toBe(0);
   });
+
+  it('labels tech unlocked by a non-human owner as alien tech', () => {
+    const feed = new MessageFeed();
+    feed.push([
+      { t: 'techUnlocked', owner: 0, key: 'laser' },
+      { t: 'techUnlocked', owner: 1, key: 'pulsar' },
+    ], 1, (owner) => owner === 0);
+    expect(feed.active(1.1).map((a) => a.msg.text)).toEqual(['New tech unlocked: Lasers', 'Alien tech: Pulsars']);
+  });
 });
 
 describe('hints and panel animation', () => {

@@ -1,32 +1,9 @@
-import type { Emit, Intent, PlayerId, Rock, System, WeaponKind, World } from '@/types';
-import { WEAPONS } from '@/types';
-import { DEFS } from '@/data';
-import { rand, randRange, structureAt, isTerrainBlocked } from '@/sim/core';
-import { addThorium } from './thorium';
-import { mapThoriumFactor } from './meteors';
+import type { Emit, Intent, Rock, Ship, System, World } from '@/types';
+import { rand, randRange, isTerrainBlocked } from '@/sim/core';
 import { ECON } from './tuning';
 
-/** Last player to carry a rock; credited when a dropped rock is later smashed over a tower. */
-const lastCarrier = new WeakMap<Rock, PlayerId>();
-
-/**
- * Smashes a rock and credits its thorium (rock.thorium * thoriumRate * map factor) to `credit`.
- * Also used by combat when a weapon shot hits a rock. Returns the thorium paid (0 if already smashed).
- */
-export function smashRock(w: World, rockId: number, credit: PlayerId, emit: Emit): number {
-  const r = w.rocks.find((x) => x.id === rockId);
-  if (!r || r.state === 'smashed') return 0;
-  if (r.state === 'grabbed' && r.carriedBy !== -1) {
-    const ship = w.players[r.carriedBy].ship;
-    if (ship.carrying === r.id) ship.carrying = 0;
-  }
-  r.state = 'smashed';
-  r.carriedBy = -1;
-  const paid = Math.round(r.thorium * w.settings.thoriumRate * mapThoriumFactor(w));
-  addThorium(w, credit, paid, emit);
-  emit({ t: 'rockSmashed', id: r.id, x: r.x, y: r.y, thorium: paid, owner: credit });
-  return paid;
-}
+/** Heading (radians) of the ship towing each rock; the rock sits on that heading, in front of the nose. */
+const towAngle = new WeakMap<Rock, number>();
 
 function release(w: World, r: Rock): void {
   if (r.carriedBy !== -1) {
@@ -37,6 +14,23 @@ function release(w: World, r: Rock): void {
   r.carriedBy = -1;
   r.vx = 0;
   r.vy = 0;
+  towAngle.delete(r);
+}
+
+function shipHeading(ship: Ship, fallback: number): number {
+  return Math.hypot(ship.vx, ship.vy) > ECON.towHeadingMinSpeed ? Math.atan2(ship.vy, ship.vx) : fallback;
+}
+
+/** Turns `cur` toward `target` by at most `maxStep`, the short way round. */
+function approachAngle(cur: number, target: number, maxStep: number): number {
+  const d = Math.atan2(Math.sin(target - cur), Math.cos(target - cur));
+  return Math.abs(d) <= maxStep ? target : cur + Math.sign(d) * maxStep;
+}
+
+function placeInFront(r: Rock, ship: Ship, angle: number): void {
+  const dist = ECON.towDistance[r.size];
+  r.x = ship.x + Math.cos(angle) * dist;
+  r.y = ship.y + Math.sin(angle) * dist;
 }
 
 export function handleRockIntent(w: World, intent: Intent, emit: Emit): boolean {
@@ -65,7 +59,7 @@ export function handleRockIntent(w: World, intent: Intent, emit: Emit): boolean 
   best.carriedBy = intent.player;
   best.vx = 0;
   best.vy = 0;
-  lastCarrier.set(best, intent.player);
+  towAngle.set(best, shipHeading(p.ship, Math.atan2(best.y - p.ship.y, best.x - p.ship.x)));
   p.ship.carrying = best.id;
   emit({ t: 'rockGrabbed', id: best.id, owner: intent.player });
   return true;
@@ -78,14 +72,14 @@ function compact(w: World): void {
   w.rocks.length = j;
 }
 
-function drift(w: World, r: Rock, dt: number): boolean {
+function drift(w: World, r: Rock, dt: number): void {
   r.x += r.vx * dt;
   r.y += r.vy * dt;
   r.spin += dt * 0.8;
   const out = 3;
   if (r.x < -out || r.y < -out || r.x > w.grid.w + out || r.y > w.grid.h + out) {
     r.state = 'smashed'; // left the map: silently removed, no payout or event
-    return false;
+    return;
   }
   const m = ECON.landMargin;
   const inside = r.x > m && r.y > m && r.x < w.grid.w - m && r.y < w.grid.h - m;
@@ -95,33 +89,24 @@ function drift(w: World, r: Rock, dt: number): boolean {
     r.vy = 0;
     r.spin += randRange(w, 0, 1);
   }
-  return true;
 }
 
-/** Rocks over a smash-capable weapon tower (turret/laser/bomber) are smashed for the carrier or tower owner. */
-function trySmashOverTower(w: World, r: Rock, emit: Emit): void {
-  const s = structureAt(w, Math.floor(r.x), Math.floor(r.y));
-  if (!s || !(WEAPONS as readonly string[]).includes(s.kind)) return;
-  if (!DEFS.weapon(s.kind as WeaponKind).smashesRocks) return;
-  const credit = r.carriedBy !== -1 ? r.carriedBy : (lastCarrier.get(r) ?? s.owner);
-  smashRock(w, r.id, credit, emit);
-}
-
-export const rocksSystem: System = (w, dt, emit) => {
+/** Drifting rocks fly and land; towed rocks ride in front of their ship. Harvesting rocks belong to harvest.ts. */
+export const rocksSystem: System = (w, dt) => {
   compact(w);
-  for (const r of w.rocks.slice()) {
-    if (r.state === 'smashed') continue;
+  for (const r of w.rocks) {
     if (r.state === 'grabbed') {
       const ship = r.carriedBy === -1 ? null : w.players[r.carriedBy].ship;
       if (!ship || ship.carrying !== r.id) {
         release(w, r);
         continue;
       }
-      r.x = ship.x;
-      r.y = ship.y;
+      const cur = towAngle.get(r) ?? shipHeading(ship, 0);
+      const angle = approachAngle(cur, shipHeading(ship, cur), ECON.towTurnRate * dt);
+      towAngle.set(r, angle);
+      placeInFront(r, ship, angle);
       r.spin += dt * 2;
-    } else if (r.state === 'drifting' && !drift(w, r, dt)) continue;
-    if (r.state !== 'drifting') trySmashOverTower(w, r, emit);
+    } else if (r.state === 'drifting') drift(w, r, dt);
   }
   compact(w);
 };

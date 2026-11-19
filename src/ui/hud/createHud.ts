@@ -24,8 +24,11 @@ export interface HudOptions {
 }
 
 export interface Hud extends HudApi {
-  /** Feed this frame's drained SimEvents (messages, denials, tech unlocks, base-hit warnings, mission errors). */
-  pushEvents(events: readonly SimEvent[], nowSec?: number): void;
+  /**
+   * Feed this frame's drained SimEvents (messages, denials, tech unlocks, base-hit warnings, mission errors).
+   * world (else the last drawn one) tells human tech unlocks from alien ones.
+   */
+  pushEvents(events: readonly SimEvent[], nowSec?: number, world?: World): void;
   /** Command produced by the pause menu (resume/restart/quitToTitle), if any. Call after draw. */
   takeCommand(): Command | null;
   reset(): void;
@@ -91,8 +94,9 @@ export function createHud(opts: HudOptions = {}): Hud {
   }
 
   return {
-    pushEvents(events, nowSec) {
-      feed.push(events, nowSec ?? lastNow);
+    pushEvents(events, nowSec, world) {
+      const w = world ?? lastWorld;
+      feed.push(events, nowSec ?? lastNow, (owner) => !w || w.players[owner]?.controller === 'human');
     },
 
     takeCommand() {

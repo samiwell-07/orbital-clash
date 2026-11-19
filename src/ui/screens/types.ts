@@ -53,6 +53,8 @@ export interface BattleConfig {
 export interface ResultsProps {
   mode: 'campaign' | 'battle';
   won: boolean;
+  /** Title names a winner (or a draw) rather than Victory/Defeat for the viewer; drawn in a neutral color. */
+  neutral?: boolean;
   title: string;
   timeSec: number;
   penaltySec: number;

@@ -95,7 +95,7 @@ function endMission(w: World, winnerTeam: number, loserTeam: number, emit: (e: {
   emit({ t: 'defeat', team: loserTeam });
 }
 
-/** Runs after the core victory system: penalties, co-op defeat, alternative objectives, final result. */
+/** Runs after the core victory system: penalties, co-op defeat (any human base falls), alternative objectives, final result. */
 export const objectivesSystem: System = (w, _dt, emit) => {
   if (!isCampaign(w)) return;
   const st = campaignState(w);
@@ -107,7 +107,7 @@ export const objectivesSystem: System = (w, _dt, emit) => {
   const enemy = scriptIds(w)[0];
   const enemyTeam = enemy === undefined ? -1 : w.players[enemy].team;
   if (!w.over) {
-    if (!w.players[humans[0]].alive) endMission(w, enemyTeam, humanTeam, emit);
+    if (humans.some((id) => !w.players[id].alive)) endMission(w, enemyTeam, humanTeam, emit);
     else if (mission.objectives.some((o) => isDone(w, o))) endMission(w, humanTeam, enemyTeam, emit);
   }
   if (w.over) {

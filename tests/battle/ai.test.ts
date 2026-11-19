@@ -134,7 +134,7 @@ describe('AdaptiveAI behaviour', () => {
     expect(intents.length).toBeGreaterThan(0);
   });
 
-  it('flies the ship to a rock, grabs it and drops it near its own turret', () => {
+  it('builds a harvester first, flies the ship to a rock, grabs it and drops it in the magnet', () => {
     const { w } = battleWorld();
     const p = w.players[0];
     p.thorium = 600;
@@ -144,13 +144,19 @@ describe('AdaptiveAI behaviour', () => {
       w.timeSec += STEP;
       for (const it of ai.update(w, 0, STEP)) applyIntent(w, it, out);
     }
-    const turret = structuresOf(w, 0).find((s) => s.kind === 'turret');
-    expect(turret).toBeDefined();
+    const harvester = structuresOf(w, 0).find((s) => s.kind === 'harvester');
+    expect(harvester).toBeDefined();
+    (harvester as { buildProgress: number }).buildProgress = 1;
+    const hx = (harvester as { tx: number }).tx;
+    p.ship.x = hx < w.grid.w / 2 ? hx + 10.5 : hx - 9.5;
     const rock = addRock(w, { x: p.ship.x + 0.3, y: p.ship.y, thorium: 20, size: 1 });
     expect(ai.update(w, 0, STEP).some((i) => i.t === 'grab')).toBe(true);
     p.ship.carrying = rock.id;
-    p.ship.x = (turret as { tx: number }).tx + 0.5;
-    p.ship.y = (turret as { ty: number }).ty + 0.5;
+    p.ship.x = (harvester as { tx: number }).tx + 0.5;
+    p.ship.y = (harvester as { ty: number }).ty + 0.5;
+    rock.state = 'grabbed';
+    rock.x = p.ship.x + 0.8;
+    rock.y = p.ship.y;
     w.timeSec += 1;
     expect(ai.update(w, 0, 1).some((i) => i.t === 'drop')).toBe(true);
   });

@@ -5,7 +5,7 @@ import { drawPanel } from '../widgets/panel';
 import { drawIcon } from '../widgets/icon';
 import { drawFooter } from './common';
 import { NameEntry } from './nameEntry';
-import { drawNameEntry, drawStats } from './resultsDraw';
+import { drawNameEntry, drawStats, resultColor } from './resultsDraw';
 import type { ResultsProps, Screen } from './types';
 
 /** Area Complete / Victory / Defeat. Optionally asks for a leaderboard name first, then offers next/retry/quit. */
@@ -40,7 +40,7 @@ export function createResultsScreen(p: ResultsProps): Screen {
     },
     draw(g, size, now, ctx) {
       if (t0 < 0) t0 = now;
-      const col = p.won ? COLORS.cyan : COLORS.danger;
+      const col = resultColor(p);
       glowText(g, p.title.toUpperCase(), size.w / 2, 110, { size: 64, color: '#fff', glow: col, align: 'center', spacing: 12, weight: 800 });
       drawStats(g, { x: size.w / 2 - 480, y: 190, w: 960, h: 380 }, p, now);
       if (naming && entry) drawNameEntry(g, { x: size.w / 2 - 480, y: 610, w: 960, h: 170 }, entry, now);

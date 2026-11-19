@@ -16,9 +16,9 @@ npm test
 
 - **Defense**: Turret, Laser, Pulsar, Bomber. Upgrade (corner marks, platform grows at max), recycle (value drops with damage), repair.
 - **Offense**: Basic Ops spawn towers (Scout, Tank, Drone, Torpedo; hold X to switch output), Special Ops / Hammer towers (Hammer, Switch, Thief, Carrier). Units teleport to your base (cap 1000) and are released from the attack menu as long single-file trains that follow the enemy's maze.
-- **Economy**: meteoroids drop Thorium rocks; grab them with your ship and drag them onto a Turret/Laser/Bomber to smash them.
+- **Economy**: meteoroids drop Thorium rocks; grab one with your ship (it rides in front of the nose) and drop it inside a Harvester's magnet. The Harvester drains it: bigger rocks take longer but pay more. Upgrading a Harvester widens its magnet.
 - **Campaign**: 4 comets (Kreios, Hathor, Aether, Helios) x 7 areas plus a Resurgence area each, 4 difficulties, 1–3 player co-op. Enemies are **scripted** by mission timelines.
-- **Battle**: 1–4 players, teams, Max Hits 1–100, per-player strength, timed mode (8x spawn at zero), Thorium rate 50–200 %, 8 maps, adaptive AI opponents.
+- **Battle**: 1–4 players, teams, Max Hits 1–100, per-player strength, timed mode (8x spawn at zero), Thorium rate 50–200 %, 16 maps, adaptive AI opponents.
 - Save data, local leaderboards with flags, 12 trophies, 16:9 and 4:3 layouts.
 
 ## Controls (PS3-style pad, keyboard fallback)
@@ -49,7 +49,7 @@ src/
   sim/build economy     construction rules, rocks, thorium, ship
   sim/army combat units spawn towers, snake trains, weapons, unit behaviours
   sim/modes             campaign (scripted timeline) and battle (+ adaptive AI)
-  data/                 unit/weapon/research defs, 32 campaign areas, 8 battle maps
+  data/                 unit/weapon/research defs, 32 campaign areas, 16 battle maps
   input/ audio/ meta/   gamepad+keyboard, synthesized sound, save/leaderboard/trophies
   render/ ui/ app/      three.js engine+terrain+models+fx, canvas HUD+menus, shell
 docs/                   architecture, style guide, mechanics notes

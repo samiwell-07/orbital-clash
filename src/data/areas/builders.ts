@@ -146,7 +146,59 @@ export function baseTilesFor(spec: Pick<MapSpec, 'w' | 'h' | 'layout'>): [Tile, 
   return [{ tx: 5, ty: 5 }, { tx: spec.w - 6, ty: spec.h - 6 }];
 }
 
-/** Authored-style plateau: cliff rim, a style stamp, craters, symmetric about the centre, bases always connected. */
+/** Preferred co-op partner spots (player ids 2 and 3) beside the human base: above/below it, or around the corner. */
+export function partnerSpotsFor(spec: Pick<MapSpec, 'w' | 'h' | 'layout'>): [Tile, Tile] {
+  const [human] = baseTilesFor(spec);
+  if (spec.layout === 'side') return [{ tx: human.tx, ty: human.ty - 4 }, { tx: human.tx, ty: human.ty + 4 }];
+  return [{ tx: human.tx + 4, ty: human.ty + 1 }, { tx: human.tx + 1, ty: human.ty + 4 }];
+}
+
+const PARTNER_GAP = 3;
+const PARTNER_SEARCH = 3;
+
+const cheb = (a: Tile, b: Tile) => Math.max(Math.abs(a.tx - b.tx), Math.abs(a.ty - b.ty));
+
+function clearAround(g: string[][], t: Tile): boolean {
+  for (let y = t.ty - 1; y <= t.ty + 1; y++) {
+    for (let x = t.tx - 1; x <= t.tx + 1; x++) if (!open(g[y]?.[x] ?? '#')) return false;
+  }
+  return true;
+}
+
+/**
+ * Picks the co-op partner base tiles after the plateau is stamped, so the authored maps stay as they
+ * were: the floor tile nearest each preferred spot whose 3x3 block is open floor, at least PARTNER_GAP
+ * from every other base and nearer the human base than the enemy's. Falls back to clearing the spot.
+ */
+function placePartners(g: string[][], spec: MapSpec, human: Tile, enemy: Tile): [Tile, Tile] {
+  const taken: Tile[] = [human, enemy];
+  const out = partnerSpotsFor(spec).map((want) => {
+    const cand: Tile[] = [];
+    for (let ty = want.ty - PARTNER_SEARCH; ty <= want.ty + PARTNER_SEARCH; ty++) {
+      for (let tx = want.tx - PARTNER_SEARCH; tx <= want.tx + PARTNER_SEARCH; tx++) {
+        const t = { tx, ty };
+        if (tx < RIM + 1 || ty < RIM + 1 || tx >= spec.w - RIM - 1 || ty >= spec.h - RIM - 1) continue;
+        if (!clearAround(g, t) || taken.some((b) => cheb(b, t) < PARTNER_GAP)) continue;
+        if (Math.hypot(tx - human.tx, ty - human.ty) >= Math.hypot(tx - enemy.tx, ty - enemy.ty)) continue;
+        cand.push(t);
+      }
+    }
+    const d = (t: Tile) => Math.hypot(t.tx - want.tx, t.ty - want.ty);
+    cand.sort((a, b) => d(a) - d(b) || a.ty - b.ty || a.tx - b.tx);
+    const pick = cand[0] ?? want;
+    if (!cand[0]) {
+      for (let y = want.ty - 1; y <= want.ty + 1; y++) for (let x = want.tx - 1; x <= want.tx + 1; x++) g[y][x] = '.';
+    }
+    taken.push(pick);
+    return pick;
+  });
+  return [out[0], out[1]];
+}
+
+/**
+ * Authored-style plateau: cliff rim, a style stamp, craters, symmetric about the centre, bases always
+ * connected. baseTiles are indexed by player id: [human, enemy, co-op partner 2, co-op partner 3].
+ */
 export function makeMap(spec: MapSpec): MapDef {
   const bases = baseTilesFor(spec);
   const c = new Canvas(spec.w, spec.h, bases);
@@ -159,9 +211,11 @@ export function makeMap(spec: MapSpec): MapDef {
     c.put(x, y, 'o');
     if (rnd() < 0.5) c.put(x + 1, y, 'o');
   }
+  const partners = placePartners(c.g, spec, bases[0], bases[1]);
   ensureConnected(c.g, bases[0], bases[1]);
+  for (const p of partners) ensureConnected(c.g, p, bases[1]);
   return {
     id: spec.id, name: spec.name, w: spec.w, h: spec.h, rows: c.g.map((r) => r.join('')),
-    baseTiles: [bases[0], bases[1], null, null], thoriumLevel: spec.thorium, rockCount: spec.rocks, palette: spec.palette,
+    baseTiles: [bases[0], bases[1], partners[0], partners[1]], thoriumLevel: spec.thorium, rockCount: spec.rocks, palette: spec.palette,
   };
 }

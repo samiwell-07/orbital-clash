@@ -35,8 +35,12 @@ describe('build rules', () => {
     w.players[0].tech.laser = true;
     expect(canBuild(w, 0, 'laser', 10, 10).ok).toBe(true);
     expect(canBuild(w, 0, 'missileSilo', 10, 10).ok).toBe(false);
+    expect(canBuild(w, 0, 'researchLab', 10, 10)).toEqual({ ok: false, reason: 'not available in this ruleset' });
     step();
     const bionic = makeSim({ profile: 'bionic' });
+    expect(canBuild(bionic.w, 0, 'researchLab', 10, 10).ok).toBe(true);
+    expect(canBuild(bionic.w, 0, 'missileSilo', 10, 10)).toEqual({ ok: false, reason: 'not unlocked' });
+    bionic.w.players[0].tech.missileSilo = true;
     expect(canBuild(bionic.w, 0, 'missileSilo', 10, 10).ok).toBe(true);
   });
 

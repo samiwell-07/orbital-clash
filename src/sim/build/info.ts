@@ -34,7 +34,10 @@ export function structureInfo(kind: StructureKind): StructureInfo | null {
   }
   if (kind in SUPPORT_DEFS) {
     const d = DEFS.support(kind);
-    return { buildCost: d.buildCost, hp: d.hp, maxLevel: 0, upgradeCost: [], requires: d.requires, profile: d.profile };
+    return {
+      buildCost: d.buildCost, hp: d.hp, maxLevel: d.maxLevel ?? 0, upgradeCost: d.upgradeCost ?? [],
+      requires: d.requires, profile: d.profile,
+    };
   }
   return null;
 }

@@ -8,6 +8,9 @@ import {
   validateBattleSetup, type BattleSetup,
 } from '@/sim/modes/battle';
 import { battleWorld } from './harness';
+import { addStructure } from '@/sim/core/entities';
+import { purchasableResearch, unlockResearch } from '@/sim/economy';
+import { ALL_TECH_KEYS, BIONIC_TECH_KEYS, UNIT_DEFS, isUnlocked, researchDef } from '@/data';
 
 const MAP = 'battle-kreios-crater';
 const duel: BattleSetup = {
@@ -92,6 +95,33 @@ describe('strength scaling', () => {
     w.players[0].thorium = 5;
     battleInitSystem(w, 0, () => {});
     expect(w.players[0].thorium).toBe(5);
+  });
+});
+
+describe('bionic research', () => {
+  it('grants base tech only, so a Bionic lab sells the Bionic items and unlocks them', () => {
+    const opts = startBattle({ ...duel, seed: 3 });
+    opts.settings.profile = 'bionic';
+    const w = createWorld(opts);
+    battleInitSystem(w, 0, () => {});
+    const p = w.players[0];
+    for (const k of ALL_TECH_KEYS) expect(p.tech[k]).toBe(true);
+    for (const k of BIONIC_TECH_KEYS) expect(p.tech[k]).toBeFalsy();
+    expect(isUnlocked(p.tech, UNIT_DEFS.snake.requires)).toBe(false);
+    addStructure(w, { kind: 'researchLab', owner: 0, tx: 1, ty: 1, hp: 120, buildProgress: 1 });
+    expect(purchasableResearch(w, 0).map((r) => r.key).sort()).toEqual([...BIONIC_TECH_KEYS].sort());
+    p.thorium = 1000;
+    expect(unlockResearch(w, 0, 'snakeSwarm', () => {}).ok).toBe(true);
+    expect(isUnlocked(p.tech, UNIT_DEFS.snake.requires)).toBe(true);
+    expect(p.thorium).toBe(1000 - researchDef('snakeSwarm')!.cost);
+  });
+
+  it('leaves Original battles with every base tech and nothing to research', () => {
+    const { w } = battleWorld();
+    expect(w.settings.profile).toBe('base');
+    for (const k of ALL_TECH_KEYS) expect(w.players[0].tech[k]).toBe(true);
+    addStructure(w, { kind: 'researchLab', owner: 0, tx: 1, ty: 1, hp: 120, buildProgress: 1 });
+    expect(purchasableResearch(w, 0)).toEqual([]);
   });
 });
 

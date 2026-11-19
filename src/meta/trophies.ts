@@ -33,7 +33,8 @@ export interface TrophyDef {
 export const LAUNCH_GOAL = 100;
 export const ARMY_GOAL = 1000;
 export const SMASH_STREAK_GOAL = 8;
-export const SMASH_STREAK_GAP_SEC = 6;
+/** Harvesting a rock takes several seconds, so streak gaps are generous. */
+export const SMASH_STREAK_GAP_SEC = 20;
 
 const hasAll = <T>(have: readonly T[], need: readonly T[]) => need.every((n) => have.includes(n));
 const KNOWN_FLAGS = ['flawlessBase', 'cometCleared', 'expertArea', 'battleWon', 'fourPlayer', 'coopArea'];
@@ -54,7 +55,7 @@ const RULES: readonly Rule[] = [
   { id: 'victor', name: 'Victor', description: 'Win a Battle.', test: (p) => p.flags.includes('battleWon') },
   { id: 'fourCorners', name: 'Four Corners', description: 'Finish a four-player Battle.', test: (p) => p.flags.includes('fourPlayer') },
   { id: 'wingmates', name: 'Wingmates', description: 'Complete a campaign area in co-op.', test: (p) => p.flags.includes('coopArea') },
-  { id: 'rockBreaker', name: 'Rock Breaker', description: `Smash ${SMASH_STREAK_GOAL} rocks in a quick streak.`, test: (p) => p.smashStreak >= SMASH_STREAK_GOAL },
+  { id: 'rockBreaker', name: 'Rock Breaker', description: `Harvest ${SMASH_STREAK_GOAL} rocks in a quick streak.`, test: (p) => p.smashStreak >= SMASH_STREAK_GOAL },
 ];
 
 export const TROPHIES: readonly TrophyDef[] = RULES.map(({ id, name, description }) => ({ id, name, description }));

@@ -48,6 +48,24 @@ function buildWeapon(c: BrainCtx, weapons: readonly Structure[], force?: WeaponK
   return ok;
 }
 
+/** Harvesters sit beside the base, off the enemy lane, like spawn towers. */
+function buildHarvester(c: BrainCtx): boolean {
+  const site = towerSite(c, mainRoute(c.w, c.p));
+  return site ? emitBuild(c, 'harvester', site) : false;
+}
+
+function upgradeHarvester(c: BrainCtx, list: readonly Structure[]): boolean {
+  const def = DEFS.support('harvester');
+  const costs = def.upgradeCost ?? [];
+  const t = [...list].filter((s) => s.level < (def.maxLevel ?? 0)).sort((a, b) => a.level - b.level || a.id - b.id)[0];
+  if (!t) return false;
+  const cost = costs[t.level];
+  if (cost === undefined || c.budget.thorium < cost * 1.5) return false;
+  c.out.push({ t: 'upgrade', player: c.me, tx: t.tx, ty: t.ty });
+  c.budget.thorium -= cost;
+  return true;
+}
+
 function buildTower(c: BrainCtx, kind: 'basicOps' | 'specialOps'): boolean {
   const site = towerSite(c, mainRoute(c.w, c.p));
   return site ? emitBuild(c, kind, site) : false;
@@ -93,7 +111,7 @@ function repairOne(c: BrainCtx, mine: readonly Structure[]): boolean {
 }
 
 /**
- * One purchase per decision, in priority order: a rock smasher, the first spawn tower, counters to
+ * One purchase per decision, in priority order: a harvester (the only thorium income), the first spawn tower, counters to
  * what is arriving, defence/offence balance, upgrades, then repairs. A critical item that is not yet
  * affordable makes the AI save instead of spending on lesser things.
  */
@@ -102,14 +120,14 @@ export function planBuild(c: BrainCtx): void {
   const weapons = mine.filter(isWeapon);
   const towers = mine.filter((s) => s.kind === 'basicOps');
   const specials = mine.filter((s) => s.kind === 'specialOps');
-  const smashers = weapons.filter((s) => DEFS.weapon(s.kind as WeaponKind).smashesRocks);
+  const harvesters = mine.filter((s) => s.kind === 'harvester');
   const wantWeapons = Math.ceil(towers.length * c.tun.weaponsPerTower) + 1;
   const underAttack = c.threat.incoming >= 3 && c.threat.nearest < 24;
   const b = c.budget;
 
-  if (smashers.length === 0) {
-    if (b.thorium < buildCost('turret')) return;
-    if (buildWeapon(c, weapons, 'turret')) return;
+  if (harvesters.length === 0) {
+    if (b.thorium < buildCost('harvester')) return;
+    if (buildHarvester(c)) return;
   }
   if (towers.length === 0) {
     if (b.thorium < buildCost('basicOps')) return;
@@ -126,6 +144,8 @@ export function planBuild(c: BrainCtx): void {
     if (buildTower(c, 'basicOps')) return;
   }
   if (upgradeTower(c, towers)) return;
+  if (towers.length >= 3 && harvesters.length < 2 && b.thorium >= buildCost('harvester') * 1.5 && buildHarvester(c)) return;
+  if (upgradeHarvester(c, harvesters)) return;
   const wantSpecials = c.tun.maxBasicOps >= 9 ? 2 : 1;
   if (unlocked(c, 'specialOps') && towers.length >= 4 && specials.length < wantSpecials) {
     if (b.thorium >= buildCost('specialOps') * 1.5 && buildTower(c, 'specialOps')) return;

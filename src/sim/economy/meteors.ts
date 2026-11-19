@@ -36,7 +36,7 @@ export function thoriumLevelOf(w: World): Level {
   return stateOf(w).level;
 }
 
-/** Smash payout multiplier from the map's thorium abundance. */
+/** Harvest payout multiplier from the map's thorium abundance. */
 export function mapThoriumFactor(w: World): number {
   return ECON.levelFactor[thoriumLevelOf(w)];
 }
@@ -67,7 +67,7 @@ export function spawnMeteor(w: World, emit: Emit): Rock {
   const size = randInt(w, 1, 3) as 1 | 2 | 3;
   const rock = addRock(w, {
     x, y, vx: ((tx - x) / len) * speed, vy: ((ty - y) / len) * speed,
-    size, thorium: size * ECON.thoriumPerSize, spin: rand(w) * Math.PI * 2,
+    size, thorium: ECON.rockThorium[size], spin: rand(w) * Math.PI * 2,
   });
   emit({ t: 'rockSpawned', id: rock.id, x, y });
   return rock;
@@ -93,7 +93,7 @@ export function spawnInitialRocks(w: World, map: MapDef, emit: Emit = defaultEmi
       if (isTerrainBlocked(w.grid, tx, ty) || occupantAt(w.grid, tx, ty) !== 0) continue;
       const size = randInt(w, 1, 3) as 1 | 2 | 3;
       const rock = addRock(w, {
-        x: tx + 0.5, y: ty + 0.5, size, thorium: size * ECON.thoriumPerSize, state: 'landed', spin: rand(w) * Math.PI * 2,
+        x: tx + 0.5, y: ty + 0.5, size, thorium: ECON.rockThorium[size], state: 'landed', spin: rand(w) * Math.PI * 2,
       });
       emit({ t: 'rockSpawned', id: rock.id, x: rock.x, y: rock.y });
       break;

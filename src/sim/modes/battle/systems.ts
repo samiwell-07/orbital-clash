@@ -47,7 +47,8 @@ function awardBonus(w: World, attacker: PlayerId, emit: Emit): void {
 
 /**
  * Runs once at tick 0 of a battle: applies Strength (Max Hits and start Thorium scale with it) and
- * unlocks all research, since Battle has no campaign progression.
+ * unlocks all base-game research, since Battle has no campaign progression. Bionic research stays
+ * locked so the Bionic Research Lab has something to sell (Original has no lab and no Bionic items).
  */
 export const battleInitSystem: System = (w) => {
   if (w.settings.mode !== 'battle' || initialised.has(w)) return;

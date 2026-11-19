@@ -6,7 +6,7 @@ const TAU = Math.PI * 2;
 const SHARD_GRAVITY = -7;
 
 /**
- * Rock smashed: crystal burst, then glowing thorium shards that arc to the owner's base (tx, tz).
+ * Rock harvested (emptied): crystal burst, then glowing thorium shards that arc to the owner's base (tx, tz).
  * Shard count scales with the thorium released.
  */
 export function emitRockBurst(fx: Fx, x: number, z: number, thorium: number, tx: number, tz: number): void {

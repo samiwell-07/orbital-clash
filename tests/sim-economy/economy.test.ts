@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SHIP_MAX_SPEED } from '@/config/constants';
 import { addRock, addStructure } from '@/sim/core';
 import {
-  awardBaseKillBonus, mapThoriumFactor, purchasableResearch, smashRock, spawnInitialRocks, unlockResearch,
+  awardBaseKillBonus, ECON, harvesterRange, mapThoriumFactor, purchasableResearch, spawnInitialRocks, unlockResearch,
 } from '@/sim/economy';
 import { generateDefaultMap } from '@/sim/core/defaultMap';
 import { makeSim } from '../sim-build/helpers';
@@ -41,68 +41,43 @@ describe('ship', () => {
 });
 
 describe('rocks', () => {
-  it('grab, carry and smash over a turret credits the carrier', () => {
+  it('a towed rock rides in front of the ship, on its heading', () => {
     const { w, step } = makeSim();
     const p = w.players[0];
-    addStructure(w, { kind: 'turret', owner: 1, tx: 20, ty: 12, hp: 100 });
-    const rock = addRock(w, { x: p.ship.x + 0.5, y: p.ship.y, size: 2, thorium: 30, state: 'landed' });
-    const cash = p.thorium;
+    p.ship.x = 10;
+    p.ship.y = 10;
+    const rock = addRock(w, { x: 10.5, y: 10, size: 2, thorium: 30, state: 'landed' });
     const grabbed = step([{ t: 'grab', player: 0 }]);
     expect(grabbed).toContainEqual({ t: 'rockGrabbed', id: rock.id, owner: 0 });
     expect(rock.state).toBe('grabbed');
     expect(p.ship.carrying).toBe(rock.id);
-    step([], 3);
-    expect([rock.x, rock.y]).toEqual([p.ship.x, p.ship.y]);
-
-    p.ship.x = 20.5;
-    p.ship.y = 12.5;
-    const ev = step();
-    const factor = mapThoriumFactor(w);
-    const paid = Math.round(30 * factor);
-    expect(ev).toContainEqual(expect.objectContaining({ t: 'rockSmashed', id: rock.id, thorium: paid, owner: 0 }));
-    expect(p.thorium).toBe(cash + paid);
-    expect(p.stats.thoriumEarned).toBe(paid);
-    expect(p.ship.carrying).toBe(0);
-    expect(w.rocks).toHaveLength(0);
+    step([move(0, 1)], 60);
+    const dist = Math.hypot(rock.x - p.ship.x, rock.y - p.ship.y);
+    expect(dist).toBeCloseTo(ECON.towDistance[2]);
+    expect(rock.y - p.ship.y).toBeCloseTo(dist, 2);
   });
 
-  it('drop leaves a landed rock that does nothing off-tower', () => {
+  it('drop leaves a landed rock where it was towed; nothing smashes it over a weapon', () => {
     const { w, step } = makeSim();
     const p = w.players[0];
+    addStructure(w, { kind: 'turret', owner: 0, tx: 20, ty: 12, hp: 100 });
     const rock = addRock(w, { x: p.ship.x, y: p.ship.y, thorium: 10, state: 'drifting', vx: 0.1 });
     step([{ t: 'grab', player: 0 }]);
     expect(rock.state).toBe('grabbed');
-    step([{ t: 'drop', player: 0 }]);
+    p.ship.x = 19.5;
+    p.ship.y = 12.5;
+    step([], 3);
+    const at = [rock.x, rock.y];
+    const cash = p.thorium;
+    step([{ t: 'drop', player: 0 }], 60);
     expect(rock.state).toBe('landed');
+    expect([rock.x, rock.y]).toEqual(at);
     expect(rock.carriedBy).toBe(-1);
     expect(p.ship.carrying).toBe(0);
     expect(w.rocks).toHaveLength(1);
-  });
-
-  it('pulsars do not smash; a landed rock over a laser pays its owner', () => {
-    const { w, step } = makeSim();
-    addStructure(w, { kind: 'pulsar', owner: 0, tx: 15, ty: 15, hp: 10 });
-    addStructure(w, { kind: 'laser', owner: 1, tx: 16, ty: 15, hp: 10 });
-    addRock(w, { x: 15.5, y: 15.5, thorium: 20, state: 'landed' });
-    const onLaser = addRock(w, { x: 16.5, y: 15.5, thorium: 20, state: 'landed' });
-    const before = w.players[1].thorium;
-    step();
-    expect(w.rocks.map((r) => r.id)).not.toContain(onLaser.id);
-    expect(w.rocks).toHaveLength(1);
-    expect(w.players[1].thorium).toBe(before + Math.round(20 * mapThoriumFactor(w)));
-  });
-
-  it('smashRock applies thoriumRate and is idempotent', () => {
-    const { w } = makeSim({ thoriumRate: 2 });
-    const rock = addRock(w, { x: 12, y: 12, thorium: 10, state: 'drifting' });
-    const evs: unknown[] = [];
-    const paid = smashRock(w, rock.id, 1, (e) => evs.push(e));
-    expect(paid).toBe(Math.round(10 * 2 * mapThoriumFactor(w)));
-    expect(smashRock(w, rock.id, 1, (e) => evs.push(e))).toBe(0);
-    expect(evs).toHaveLength(2);
+    expect(p.thorium).toBe(cash);
   });
 });
-
 describe('meteors', () => {
   const run = (over = {}) => {
     const g = makeSim(over);
@@ -146,23 +121,76 @@ describe('thorium and bionic layer', () => {
     expect(awardBaseKillBonus(camp.w, 0, 100)).toBe(0);
   });
 
-  it('harvesters trickle thorium from nearby landed rocks (bionic only)', () => {
+  it('harvesters work in every ruleset: the magnet pulls a rock in and drains it for its owner', () => {
     for (const profile of ['bionic', 'base'] as const) {
       const { w, step } = makeSim({ profile });
-      const h = addStructure(w, { kind: 'harvester', owner: 0, tx: 20, ty: 12, hp: 10, buildProgress: 1 });
-      const rock = addRock(w, { x: 21.5, y: 12.5, thorium: 8, state: 'landed' });
+      addStructure(w, { kind: 'harvester', owner: 0, tx: 20, ty: 12, hp: 10, buildProgress: 1 });
+      const rock = addRock(w, { x: 22.5, y: 12.5, size: 1, thorium: ECON.rockThorium[1], state: 'landed' });
       const cash = w.players[0].thorium;
-      step([], 60 * 6);
-      if (profile === 'base') {
-        expect(w.players[0].thorium).toBe(cash);
-        continue;
-      }
-      expect(h.cooldown).toBeGreaterThan(-1);
-      expect(w.players[0].thorium).toBeGreaterThan(cash);
+      step();
+      expect(rock.state).toBe('harvesting');
+      const ev = step([], 60 * 6);
+      const paid = Math.round(ECON.rockThorium[1] * mapThoriumFactor(w));
+      expect(w.players[0].thorium).toBe(cash + paid);
+      expect(ev).toContainEqual(expect.objectContaining({ t: 'rockSmashed', id: rock.id, thorium: paid, owner: 0 }));
       expect(w.rocks.includes(rock)).toBe(false);
     }
   });
 
+  it('upgrading widens the magnet', () => {
+    const { w, step } = makeSim();
+    const h = addStructure(w, { kind: 'harvester', owner: 0, tx: 20, ty: 12, hp: 10, buildProgress: 1 });
+    const d = (harvesterRange(0) + harvesterRange(1)) / 2;
+    const rock = addRock(w, { x: 20.5 + d, y: 12.5, size: 1, thorium: 15, state: 'landed' });
+    step([], 30);
+    expect(rock.state).toBe('landed');
+    h.level = 1;
+    step();
+    expect(rock.state).toBe('harvesting');
+  });
+
+  it('bigger rocks take longer to harvest but pay more', () => {
+    const harvest = (size: 1 | 3) => {
+      const { w, step } = makeSim();
+      addStructure(w, { kind: 'harvester', owner: 0, tx: 20, ty: 12, hp: 10, buildProgress: 1 });
+      addRock(w, { x: 20.5, y: 12.5, size, thorium: ECON.rockThorium[size], state: 'landed' });
+      const cash = w.players[0].thorium;
+      let ticks = 0;
+      while (w.rocks.length > 0 && ticks < 60 * 60) {
+        step();
+        ticks++;
+      }
+      return { ticks, paid: w.players[0].thorium - cash };
+    };
+    const small = harvest(1);
+    const big = harvest(3);
+    expect(big.ticks).toBeGreaterThan(small.ticks * 2);
+    expect(big.paid).toBeGreaterThan(small.paid * 3);
+  });
+
+  it('the magnet ignores a towed rock until it is dropped inside the range', () => {
+    const { w, step } = makeSim();
+    const p = w.players[0];
+    addStructure(w, { kind: 'harvester', owner: 0, tx: 20, ty: 12, hp: 10, buildProgress: 1 });
+    p.ship.x = 21.5;
+    p.ship.y = 12.5;
+    const rock = addRock(w, { x: 21.5, y: 12.5, size: 1, thorium: 15, state: 'landed' });
+    step([{ t: 'grab', player: 0 }], 30);
+    expect(rock.state).toBe('grabbed');
+    step([{ t: 'drop', player: 0 }], 2);
+    expect(rock.state).toBe('harvesting');
+  });
+
+  it('a harvester destroyed mid-harvest drops its rock', () => {
+    const { w, step } = makeSim();
+    const h = addStructure(w, { kind: 'harvester', owner: 0, tx: 20, ty: 12, hp: 10, buildProgress: 1 });
+    const rock = addRock(w, { x: 21.5, y: 12.5, size: 3, thorium: ECON.rockThorium[3], state: 'landed' });
+    step([], 90);
+    expect(rock.state).toBe('harvesting');
+    w.structures.delete(h.id);
+    step();
+    expect(rock.state).toBe('landed');
+  });
   it('research labs sell tech', () => {
     const { w, step } = makeSim({ profile: 'bionic' });
     expect(purchasableResearch(w, 0)).toEqual([]);

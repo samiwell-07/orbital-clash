@@ -23,13 +23,16 @@ function floodFrom(m: MapDef, sx: number, sy: number): Set<number> {
 }
 
 describe('battle map set', () => {
-  it('ships 8 maps: 4 base + 4 from patch 1.03, one per comet each', () => {
-    expect(BATTLE_MAPS).toHaveLength(8);
+  it('ships 16 maps: 4 base + 4 from patch 1.03 (one per comet) + 8 expansion maps (two per comet)', () => {
+    expect(BATTLE_MAPS).toHaveLength(16);
     const s = battleMapSummaries();
     for (const release of ['base', 'patch-1.03'] as const) {
       expect(s.filter((m) => m.release === release).map((m) => m.palette).sort()).toEqual(['aether', 'hathor', 'helios', 'kreios']);
     }
-    expect(new Set(BATTLE_MAPS.map((m) => m.id)).size).toBe(8);
+    expect(s.filter((m) => m.release === 'expansion').map((m) => m.palette).sort())
+      .toEqual(['aether', 'aether', 'hathor', 'hathor', 'helios', 'helios', 'kreios', 'kreios']);
+    expect(new Set(BATTLE_MAPS.map((m) => m.id)).size).toBe(16);
+    expect(new Set(BATTLE_MAPS.map((m) => m.name)).size).toBe(16);
     expect(s.some((m) => m.freeBase)).toBe(true);
   });
 
@@ -89,6 +92,29 @@ describe.each(BATTLE_MAPS.map((m) => [m.id, m] as const))('map %s', (_id, m) => 
       expect(t[3]).toEqual(rot(t[2] as { tx: number; ty: number }));
       expect((t[2] as { tx: number }).tx).toBe(m.w - 1 - (t[0] as { tx: number }).tx);
       for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) expect(at(m, x, y)).toBe(at(m, m.w - 1 - x, y));
+    }
+  });
+
+  it('links every pair of bases by ground; free-base maps have one floor region with room for every player', () => {
+    const tiles = m.baseTiles.filter((b): b is { tx: number; ty: number } => b !== null);
+    for (const a of tiles) {
+      const reach = floodFrom(m, a.tx, a.ty);
+      for (const b of tiles) expect(reach.has(b.ty * m.w + b.tx)).toBe(true);
+    }
+    if (tiles.length) return;
+    const floor: [number, number][] = [];
+    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (at(m, x, y) === '.') floor.push([x, y]);
+    expect(floodFrom(m, floor[0][0], floor[0][1]).size).toBe(floor.length);
+    const roomy = ([x, y]: [number, number]): boolean => {
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (m.rows[y + dy]?.[x + dx] !== '.') return false;
+      return true;
+    };
+    const sites = floor.filter(roomy);
+    const far = sites.some((p) => sites.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) > 14));
+    expect(far).toBe(true);
+    if (m.baseTiles.length < 4) return;
+    for (const [qx, qy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+      expect(sites.some(([x, y]) => (x < m.w / 2 ? 0 : 1) === qx && (y < m.h / 2 ? 0 : 1) === qy)).toBe(true);
     }
   });
 

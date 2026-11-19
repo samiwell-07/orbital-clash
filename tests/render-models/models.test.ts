@@ -111,7 +111,8 @@ describe('upgrade level -> platform marks', () => {
     expect(platformVariant(3, 3)).toBe(GROWN_VARIANT);
     expect(maxLevelOf('turret')).toBe(3);
     expect(maxLevelOf('specialOps')).toBe(2);
-    expect(maxLevelOf('harvester')).toBe(0);
+    expect(maxLevelOf('harvester')).toBe(3);
+    expect(maxLevelOf('researchLab')).toBe(0);
   });
 });
 

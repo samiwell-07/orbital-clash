@@ -6,12 +6,12 @@ import { harvestSystem } from './harvest';
 import { handleResearchIntent } from './research';
 
 export { addThorium, spendThorium, awardBaseKillBonus } from './thorium';
-export { smashRock, handleRockIntent, rocksSystem } from './rocks';
+export { handleRockIntent, rocksSystem } from './rocks';
 export {
   spawnInitialRocks, spawnMeteor, meteorSystem, setWorldMap, thoriumLevelOf, mapThoriumFactor, meteorInterval,
 } from './meteors';
 export { handleShipIntent, shipSystem } from './ship';
-export { harvestSystem } from './harvest';
+export { harvestSystem, harvesterRange } from './harvest';
 export { hasResearchLab, purchasableResearch, unlockResearch, handleResearchIntent } from './research';
 export type { ResearchResult } from './research';
 export { ECON } from './tuning';

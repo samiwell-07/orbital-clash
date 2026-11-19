@@ -29,7 +29,8 @@ export class MessageFeed {
   private nextId = 1;
   private lastHit: Record<number, number> = {};
 
-  push(events: readonly SimEvent[], now: number): void {
+  /** isHuman tells player-owned tech unlocks from alien ones (default: every owner counts as human). */
+  push(events: readonly SimEvent[], now: number, isHuman: (owner: PlayerId) => boolean = () => true): void {
     for (const e of events) {
       switch (e.t) {
         case 'message':
@@ -39,7 +40,7 @@ export class MessageFeed {
           this.add('denied', e.reason, e.owner, now);
           break;
         case 'techUnlocked':
-          this.add('tech', `New tech unlocked: ${techLabel(e.key)}`, e.owner, now);
+          this.add('tech', `${isHuman(e.owner) ? 'New tech unlocked' : 'Alien tech'}: ${techLabel(e.key)}`, e.owner, now);
           break;
         case 'baseHit':
           this.lastHit[e.target] = now;

@@ -8,8 +8,14 @@ import type { ResultsProps } from './types';
 
 export const RANK_COLORS: Record<string, string> = { S: '#ffd23c', A: '#66ff9a', B: '#38e8ff', C: '#e9ecef', D: '#9aa0aa' };
 
+/** Accent for the title and stats panel: neutral results (draw, named winner) don't take a side. */
+export function resultColor(p: Pick<ResultsProps, 'won' | 'neutral'>): string {
+  if (p.neutral) return COLORS.text;
+  return p.won ? COLORS.cyan : COLORS.danger;
+}
+
 export function drawStats(g: Ctx, r: Rect, p: ResultsProps, now: number): void {
-  drawPanel(g, r, { chamfer: 16, alpha: 0.9, edge: p.won ? COLORS.cyan : COLORS.danger });
+  drawPanel(g, r, { chamfer: 16, alpha: 0.9, edge: resultColor(p) });
   if (p.rank) {
     const col = RANK_COLORS[p.rank] ?? '#fff';
     glowText(g, p.rank, r.x + 150, r.y + r.h * 0.42, { size: 190 + 6 * Math.sin(now * 3), color: col, glow: col, align: 'center', weight: 900 });

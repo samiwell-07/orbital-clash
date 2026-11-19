@@ -49,12 +49,12 @@ export const UNIT_DEFS: Readonly<Record<UnitKind, UnitDef>> = {
     spawnSeconds: 6.0, unlockCost: 0, radius: 0.55,
   },
   snake: {
-    kind: 'snake', name: 'Snake', tier: 'bionic', layer: 'ground', requires: null,
+    kind: 'snake', name: 'Snake', tier: 'bionic', layer: 'ground', requires: 'snakeSwarm',
     hp: 90, speed: 2.2, structureDamage: 4, baseHits: 1,
     spawnSeconds: 5.0, unlockCost: 0, radius: 0.3,
   },
   dragon: {
-    kind: 'dragon', name: 'Dragon', tier: 'bionic', layer: 'air', requires: null,
+    kind: 'dragon', name: 'Dragon', tier: 'bionic', layer: 'air', requires: 'dragonSwarm',
     hp: 260, speed: 3.0, structureDamage: 30, baseHits: 3,
     spawnSeconds: 8.0, unlockCost: 0, radius: 0.5,
   },

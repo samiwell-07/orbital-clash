@@ -1,6 +1,6 @@
-import type { Intent, PlayerId, Rock, Structure, World, WeaponKind } from '@/types';
-import { DEFS } from '@/data';
+import type { Intent, PlayerId, Rock, Structure, World } from '@/types';
 import { structuresOf } from '@/sim/core/entities';
+import { harvesterRange } from '@/sim/economy/harvest';
 import type { AiMemory } from './ctx';
 import { SHIP_STEER } from './tuning';
 
@@ -11,10 +11,15 @@ interface Goal {
 
 const centre = (s: Structure): Goal => ({ x: s.tx + 0.5, y: s.ty + 0.5 });
 
-function smashers(w: World, me: PlayerId): Structure[] {
-  return structuresOf(w, me).filter(
-    (s) => (s.kind === 'turret' || s.kind === 'laser' || s.kind === 'bomber') && DEFS.weapon(s.kind as WeaponKind).smashesRocks,
-  );
+function harvesters(w: World, me: PlayerId): Structure[] {
+  return structuresOf(w, me).filter((s) => s.kind === 'harvester' && s.buildProgress >= 1);
+}
+
+const isFree = (r: Rock): boolean => (r.state === 'drifting' || r.state === 'landed') && r.thorium > 0;
+
+/** A free rock already inside one of my magnets will be pulled in without help. */
+function inMagnet(list: readonly Structure[], r: Rock): boolean {
+  return list.some((s) => Math.hypot(s.tx + 0.5 - r.x, s.ty + 0.5 - r.y) <= harvesterRange(s.level));
 }
 
 function nearestTo(list: readonly Structure[], x: number, y: number): Structure | null {
@@ -30,14 +35,14 @@ function nearestTo(list: readonly Structure[], x: number, y: number): Structure 
   return best;
 }
 
-/** Cheapest rock to bring home: close to the ship and close to a weapon that can smash it. */
+/** Cheapest rock to bring home: close to the ship and close to one of my harvesters. */
 function pickRock(w: World, mem: AiMemory, towers: readonly Structure[], sx: number, sy: number): Rock | null {
-  const kept = w.rocks.find((r) => r.id === mem.rockId && r.state === 'drifting');
+  const kept = w.rocks.find((r) => r.id === mem.rockId && isFree(r) && !inMagnet(towers, r));
   if (kept) return kept;
   let best: Rock | null = null;
   let bs = Infinity;
   for (const r of w.rocks) {
-    if (r.state !== 'drifting' || r.thorium <= 0) continue;
+    if (!isFree(r) || inMagnet(towers, r)) continue;
     const t = nearestTo(towers, r.x, r.y);
     const score = Math.hypot(r.x - sx, r.y - sy) + 0.6 * (t ? Math.hypot(t.tx + 0.5 - r.x, t.ty + 0.5 - r.y) : 0);
     if (score < bs) {
@@ -65,15 +70,15 @@ function steer(w: World, me: PlayerId, goal: Goal): Intent {
 }
 
 /**
- * Economy: fly the ship to the best drifting rock, grab it, tow it into range of one of its own
- * rock-smashing weapons and drop it there. Runs every tick (steering needs fine control).
+ * Economy: fly the ship to the best free rock, grab it, tow it into one of its own harvesters'
+ * magnets and drop it there (magnets ignore towed rocks). Runs every tick (steering needs fine control).
  */
 export function shipIntents(w: World, me: PlayerId, mem: AiMemory, dt: number): Intent[] {
   const p = w.players[me];
   if (!p.baseBuilt) return [];
   mem.grabCooldown = Math.max(0, mem.grabCooldown - dt);
   const ship = p.ship;
-  const towers = smashers(w, me);
+  const towers = harvesters(w, me);
   const home: Goal = { x: p.baseTx + 0.5, y: p.baseTy + 0.5 };
   const out: Intent[] = [];
   let goal: Goal = home;
@@ -82,8 +87,9 @@ export function shipIntents(w: World, me: PlayerId, mem: AiMemory, dt: number): 
     const s = nearestTo(towers, ship.x, ship.y);
     if (s) {
       goal = centre(s);
-      const range = DEFS.weapon(s.kind as WeaponKind).range[s.level] ?? 4;
-      if (mem.grabCooldown === 0 && Math.hypot(goal.x - ship.x, goal.y - ship.y) <= range * 0.7) {
+      const held = w.rocks.find((r) => r.id === ship.carrying);
+      const near = held ? Math.hypot(goal.x - held.x, goal.y - held.y) : Math.hypot(goal.x - ship.x, goal.y - ship.y);
+      if (mem.grabCooldown === 0 && near <= harvesterRange(s.level) * 0.6) {
         out.push({ t: 'drop', player: me });
         mem.grabCooldown = SHIP_STEER.repeatSec;
         mem.rockId = 0;

@@ -32,7 +32,11 @@ describe('build menu data', () => {
   it('hides Bionic-only structures in the base ruleset and shows them in Bionic', () => {
     const p = fakePlayer(0);
     expect(buildKindsFor(fakeWorld([p], 'base'))).not.toContain('missileSilo');
+    expect(buildKindsFor(fakeWorld([p], 'base'))).not.toContain('researchLab');
     expect(buildKindsFor(fakeWorld([p], 'bionic'))).toContain('missileSilo');
+    expect(buildKindsFor(fakeWorld([p], 'bionic'))).toContain('researchLab');
+    const silo = buildItemsFor(fakeWorld([p], 'bionic'), 0).find((i) => i.kind === 'missileSilo');
+    expect(silo).toMatchObject({ locked: true, lockReason: 'Requires Missile Silo' });
   });
 
   it('windows long lists around the selection', () => {

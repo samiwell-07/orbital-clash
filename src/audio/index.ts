@@ -21,8 +21,8 @@ export function createAudio(): GameAudio {
     unlock() {
       void unlockContext().then((ok) => ok && music.resume());
     },
-    handle(events) {
-      if (getBus()) handleEvents(events, playSound);
+    handle(events, isHuman) {
+      if (getBus()) handleEvents(events, playSound, isHuman);
     },
     music(mode) {
       music.set(mode);

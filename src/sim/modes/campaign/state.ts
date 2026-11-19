@@ -20,6 +20,8 @@ export interface CampaignState {
   enemyPlaced: number;
   objectives: { id: string; text: string; atSec: number }[];
   lastHits: number;
+  /** Scripted release events fired so far; picks the next human base to attack (round-robin). */
+  releaseCursor: number;
   finished: boolean;
   won: boolean;
   finishSec: number;
@@ -32,7 +34,7 @@ export function campaignState(w: World): CampaignState {
   if (!s) {
     s = {
       setupDone: false, compiled: null, errors: [], errored: false, enemyPlaced: 0,
-      objectives: [], lastHits: 0, finished: false, won: false, finishSec: 0,
+      objectives: [], lastHits: 0, releaseCursor: 0, finished: false, won: false, finishSec: 0,
     };
     states.set(w, s);
   }

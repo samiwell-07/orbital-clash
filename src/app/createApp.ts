@@ -165,8 +165,8 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
     const world = s.sim.world;
     renderer?.draw(world, alpha, events, now);
     updateCursors(renderer?.getLayer<TerrainLayer>('terrain'), s);
-    audio.handle(events);
-    hud.pushEvents(events, now);
+    audio.handle(events, (owner) => world.players[owner]?.controller === 'human');
+    hud.pushEvents(events, now, world);
     save = feedTrophies(save, events, now);
     ctx.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
     hud.draw(ctx, world, s.input, now);

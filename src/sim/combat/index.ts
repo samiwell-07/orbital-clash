@@ -6,7 +6,6 @@ export * from './targeting';
 export * from './damage';
 export { weaponSystem } from './weaponSystem';
 export { projectileSystem } from './projectiles';
-export { hitRock } from './rocks';
 
 /** Registers the 'combat' and 'projectiles' pipeline stages. Idempotent (systems are replaced by name). */
 export function registerCombatSystems(): void {

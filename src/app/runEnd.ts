@@ -30,6 +30,32 @@ export function updateCursors(terrain: TerrainLayer | undefined, session: Sessio
   );
 }
 
+export interface BattleOutcome {
+  /** True when at least one local human is on the winning team. */
+  won: boolean;
+  title: string;
+  /** Title doesn't speak for a single side (draw, or several human teams): show it in a neutral color. */
+  neutral: boolean;
+}
+
+/** Same letters as the battle setup screen's TEAM_NAMES. */
+const teamName = (team: number): string => `Team ${'ABCD'[team] ?? team + 1}`;
+
+/** Names the battle result. Victory/Defeat only when every local human shares one team; otherwise names the winner. */
+export function battleOutcome(
+  players: readonly { id: PlayerId; team: number; controller: string }[],
+  humans: readonly PlayerId[],
+  winnerTeam: number,
+): BattleOutcome {
+  const humanTeams = new Set(humans.map((id) => players[id]?.team));
+  const won = winnerTeam !== -1 && humanTeams.has(winnerTeam);
+  if (winnerTeam === -1) return { won: false, title: 'Draw', neutral: true };
+  if (humanTeams.size <= 1) return { won, title: won ? 'Victory' : 'Defeat', neutral: false };
+  const winners = players.filter((p) => p.team === winnerTeam && p.controller !== 'none');
+  const title = winners.length === 1 ? `Player ${winners[0].id + 1} Wins` : `${teamName(winnerTeam)} Wins`;
+  return { won, title, neutral: true };
+}
+
 export interface Finish {
   save: SaveData;
   props: ResultsProps;
@@ -39,13 +65,13 @@ export interface Finish {
 export function finishRun(session: Session, save: SaveData): Finish {
   const w: World = session.sim.world;
   const { spec } = session;
-  const humanTeam = w.players[spec.humans[0] ?? 0].team;
-
   if (spec.kind === 'battle') {
-    const won = w.winnerTeam === humanTeam;
-    let next = applyTrophyEvent(save, { t: 'battleEnd', won, players: w.players.filter((p) => p.controller !== 'none').length }).save;
+    const out = battleOutcome(w.players, spec.humans, w.winnerTeam);
+    // The save (and its trophies) is shared by all local players, so one battleEnd event stands for every local
+    // human: it counts as a win when any local human is on the winning team (a hot-seat loser doesn't cancel it).
+    let next = applyTrophyEvent(save, { t: 'battleEnd', won: out.won, players: w.players.filter((p) => p.controller !== 'none').length }).save;
     next = { ...next, trophies: drainTrophyNotifications(next.trophies).progress };
-    return { save: next, props: { mode: 'battle', won, title: won ? 'Victory' : 'Defeat', timeSec: w.timeSec, penaltySec: 0 } };
+    return { save: next, props: { mode: 'battle', won: out.won, neutral: out.neutral, title: out.title, timeSec: w.timeSec, penaltySec: 0 } };
   }
 
   const res = campaignResult(w);

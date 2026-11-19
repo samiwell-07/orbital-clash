@@ -14,7 +14,7 @@ Types referenced: `src/types/ids.ts`, `defs.ts`, `mission.ts`, `input.ts`; const
 
 - Genre: tower defense **plus tower offense** with light RTS: you defend against enemy rushes with weapons and *fight back* with your own army that you build, store at your base and release in a rush. [official]
 - Story: scientists detect comets heading for home; you land on each, fight the alien forces and capture it. Defeating aliens grants access to their technology. [official]
-- Resource: **Thorium**, found in rocks (meteoroids) orbiting/drifting over the comet. The ship grabs a rock and drags it to a weapon which smashes it and releases Thorium. Thorium pays for structures and upgrades. [official]
+- Resource: **Thorium**, found in rocks (meteoroids) orbiting/drifting over the comet. The ship grabs a rock and tows it to a **Harvester**, whose magnet pulls it in and drains its Thorium. Thorium pays for structures and upgrades. [official; harvester-only collection is a design change]
 - Win: destroy the enemy base (reduce its hit counter to 0) by getting units to it. Lose: your base's hit counter reaches 0. [official/observed: HUD hit bars]
 - Players: Campaign 1-3 (offline co-op), Battle 1-4 with configurable teams. No online play (official FAQ). [official]
 - Perspective: top-down; the player controls a **ship cursor** that hovers over the map to build, upgrade, repair, recycle, grab rocks, and open menus. [official]
@@ -24,7 +24,7 @@ Types referenced: `src/types/ids.ts`, `defs.ts`, `mission.ts`, `input.ts`; const
 ## 2. Core loop & simulation rules
 
 1. **Build base** (Battle: choose any free tile not covered by a rock or another base; Campaign: base pre-placed). [official]
-2. Fly the ship, grab rocks, smash them at weapons to earn Thorium. [official]
+2. Build a Harvester, fly the ship, grab rocks and drop them inside the Harvester's magnet to earn Thorium. [design change]
 3. Build weapons to stop enemy trains; build Basic/Special Ops spawn towers to produce your own units. Each tower produces a new unit every few seconds and teleports it to your base where it waits for the attack command. [official]
 4. Open the attack menu, tilt toward a unit type; units of that type leave the base along the shortest path to the target base. [official]
 5. Enemy/own paths are a **flow field over free tiles**: units go around structures; you can reshape the path by placing/removing buildings ("instantly manipulated"). You must always leave at least one access route to a base. [official/observed]
@@ -65,14 +65,16 @@ PS3 pad actions from the manual, mapped to our inputs. `Intent` types in `src/ty
 Behaviour:
 - Hovering over a structure shows cost to upgrade, recycle value, repair cost, and its range as a **dashed red circle** (also shown when first built). [official]
 - A weapon's range circle appears on build. [official]
-- Co-op: each human has their own ship/colour and personal Thorium counter, shares the campaign base-hit total (guess) [tuned/guess].
+- Co-op: each human has their own ship/colour, personal Thorium counter and **own base** (fixed spot beside the lead base, in their colour; only joined players get one). Units each player produces are stored in and launched from their own base. Alien releases take turns between the living human bases (one release event each, ascending player id). The team **loses as soon as any human base falls**; time penalties count hits on every human base [design change].
 
 ---
 
 ## 4. Economy: Thorium, rocks, ship
 
-- Thorium is only obtained from **rocks/meteoroids**. They drift randomly across the playfield. **Only Laser, Bomber and Turret will shoot, destroy and release Thorium from them; Pulsar does not.** [official, Wikipedia + manual]
-- The ship **grabs a rock and drags it** to a weapon, which smashes it. [official]
+- Thorium is only obtained from **rocks/meteoroids**, and only through a **Harvester**. Rocks drift across the playfield and land. **No weapon shoots or destroys rocks.** [design change; the original let Turret/Laser/Bomber smash them]
+- The ship **grabs a rock and tows it in front of its nose** (the rock swings round to follow the ship's heading) and drops it inside a Harvester's magnet. [design change]
+- Harvester magnet (`ECON.harvesterRange`, by level 0-3): 3 / 4 / 5 / 6.5 tiles. Upgrade cost 60 / 100 / 150. The magnet locks the nearest free rock (drifting or landed, **never one a ship is towing**), pulls it onto the pad at 2.5 tiles/s and drains 5 raw Thorium per second (x `thoriumRate` x map factor) until it is empty. One rock per Harvester at a time; a Harvester destroyed mid-harvest drops its rock. Any player's Harvester takes any free rock in its range. [tuned]
+- Rock Thorium (`ECON.rockThorium`) grows faster than size: small 15 (3 s), medium 40 (8 s), large 75 (15 s). [tuned]
 - Starting rocks per map = `MapDef.rockCount`; new rocks enter from a map-edge hint at an interval driven by `thoriumLevel`. [tuned]
 
 ### Tuned rock model
@@ -83,9 +85,9 @@ Behaviour:
 | Large | 1.1 | 200 | 50 | 10 % |
 
 - Drift speed 0.25-0.6 tiles/s, random heading, bounce off cliffs; rock spawns every `12 / thoriumLevelMult` seconds per map (`thoriumLevel` 1/2/3 -> mult 0.5/1.0/2.0 matching Battle "50 %..200 %" options). [tuned]
-- A weapon in range of a rock treats it as a low-priority target when no unit is in range (units always win) and deals normal damage; thorium is released in a burst of shards that auto-fly to the *grabbing/last-dragging* player's counter (50 % radius pickup glow). A rock smashed by an enemy tower pays nobody. [tuned/guess]
+- When a Harvester empties a rock, it bursts (`rockSmashed`) and its shards fly to the Harvester owner's base. [tuned]
 - Rocks do not block pathing: they drift over structures and units as overlays, but cannot be dragged onto a base. [tuned/guess]
-- Ship drag: while holding a rock the ship accelerates at 70 % and tows the rock with a spring. Max carry 1 rock. Ship physics from config: accel 40 t/s², max 11 t/s, drag 6. [tuned]
+- Ship drag: while holding a rock the ship accelerates more slowly (bigger rocks slow it more). Max carry 1 rock. Ship physics from config: accel 40 t/s², max 11 t/s, drag 6. [tuned]
 - Start Thorium: per mission `startThorium` x difficulty multiplier (§11). Battle: set by map symbol 1-3 and the Thorium-rate option (50-200 %). [official: options; numbers tuned]
 - Battle bonus: the player who destroys an enemy base gets a Thorium bonus (patch 1.01). [official] Tuned: +250.
 
@@ -95,27 +97,27 @@ Behaviour:
 
 Four weapons [official]: **Turret, Laser, Pulsar, Bomber**. Official: some hit ground only, some air only, some both. Unlock order observed: Turret (start) -> Laser (Kreios 2) -> Pulsar (Hathor 8) -> Bomber (Hathor 10). [observed, Fandom snippet]
 
-Layer / rock behaviour:
-| Weapon | Hits ground | Hits air | Smashes rocks | Basis |
-|---|---|---|---|---|
-| Turret | yes | no | **yes** | rock rule [official]; masks [tuned/guess] |
-| Laser | yes | yes (hybrid) | **yes** | rock rule [official]; masks [tuned/guess] |
-| Pulsar | yes | no | **no** | "ground attacking only", only hits things within **one square radius**, even fully upgraded; best on the front line, strong against torpedoes in a "speed trap"; cost 50 Thorium [observed, Fandom snippet] |
-| Bomber | yes | yes (splash) | **yes** | rock rule [official]; splash [tuned/guess] |
+Layer behaviour (no weapon targets rocks):
+| Weapon | Hits ground | Hits air | Basis |
+|---|---|---|---|
+| Turret | yes | no | masks [tuned/guess] |
+| Laser | yes | yes (hybrid) | masks [tuned/guess] |
+| Pulsar | yes | no | "ground attacking only", only hits things within **one square radius**, even fully upgraded; best on the front line, strong against torpedoes in a "speed trap"; cost 50 Thorium [observed, Fandom snippet] |
+| Bomber | yes | yes (splash) | splash [tuned/guess] |
 
 Common rules [official]: bought with Thorium from the build menu on an empty tile; upgrade with O; recycle refunds part of invested Thorium (less when damaged); repair costs more the greater the damage; weapons can be destroyed by enemy fire; **each upgrade adds a black mark on each platform corner; at max level the base grows and corners turn solid black**. Max level = `maxLevel` 3 (three marks) [tuned to match: marks 1-3 then "grown"].
 
 ### Tuned weapon table (`WeaponDef`; arrays indexed by level 0-3)
-| Weapon | targets | buildCost | upgradeCost (to L1,L2,L3) | hp | range (tiles) | damage / shot | cooldown (s) | splash (tiles) | smashesRocks | requires |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Turret | ground | 20 | 15, 25, 40 | 120 | 4, 4.5, 5, 5.5 | 4, 6, 9, 13 | 0.50, 0.45, 0.40, 0.35 | 0 | true | null |
-| Laser | both | 35 | 25, 40, 60 | 100 | 6, 7, 8, 9 | 10, 16, 24, 36 | 0.90, 0.85, 0.80, 0.70 | 0 | true | `laser` |
-| Pulsar | ground | 50 | 30, 50, 80 | 150 | 1.5, 1.5, 1.5, 1.5 | 14, 22, 34, 50 | 0.80, 0.70, 0.60, 0.50 | 1.5 (hits all in radius) | false | `pulsar` |
-| Bomber | both | 60 | 40, 60, 90 | 110 | 5, 5.5, 6, 6.5 | 18, 28, 42, 60 | 1.60, 1.50, 1.40, 1.20 | 1.2 | true | `bomber` |
+| Weapon | targets | buildCost | upgradeCost (to L1,L2,L3) | hp | range (tiles) | damage / shot | cooldown (s) | splash (tiles) | requires |
+|---|---|---|---|---|---|---|---|---|---|
+| Turret | ground | 20 | 15, 25, 40 | 120 | 4, 4.5, 5, 5.5 | 4, 6, 9, 13 | 0.50, 0.45, 0.40, 0.35 | 0 | null |
+| Laser | both | 35 | 25, 40, 60 | 100 | 6, 7, 8, 9 | 10, 16, 24, 36 | 0.90, 0.85, 0.80, 0.70 | 0 | `laser` |
+| Pulsar | ground | 50 | 30, 50, 80 | 150 | 1.5, 1.5, 1.5, 1.5 | 14, 22, 34, 50 | 0.80, 0.70, 0.60, 0.50 | 1.5 (hits all in radius) | `pulsar` |
+| Bomber | both | 60 | 40, 60, 90 | 110 | 5, 5.5, 6, 6.5 | 18, 28, 42, 60 | 1.60, 1.50, 1.40, 1.20 | 1.2 | `bomber` |
 
 Sanity numbers [tuned]: a level-0 Turret (8 dps) takes ~1.5 s to kill a Scout (hp 12) and a Scout crosses its 8-tile diameter in ~2.5 s -> a lone turret stops about one scout stream; ~6 turrets are needed to hold a 60-unit tank column. Pulsar dps is ~17-100 per target but applies to every unit in the 1.5 radius, making it the crowd-killer at chokepoints. Bomber has the best splash dps but slow shells (travel time 0.4 s) so fast units (torpedo) slip through.
 
-Targeting priority [tuned]: closest to *its own base* first (units about to hit the base), then closest to the weapon; rocks only if no enemy in range and the weapon `smashesRocks`.
+Targeting priority [tuned]: closest to *its own base* first (units about to hit the base), then closest to the weapon. Rocks are never targeted.
 
 Special rule: **splash** damage never hurts friendly units (no friendly fire). [tuned]
 
@@ -191,7 +193,7 @@ All [official] unless noted, applied to weapons *and* spawn towers.
 | Special Ops (Hammer tower) | 120 | - | 160 | `hammer` | base |
 | Gateway (pair) | 10 | - | 60 | `gateway` | both |
 | Waypoint | 5 | - | 30 | `waypoint` | both |
-| Harvesting station | 80 | - | 110 | `bionic` | bionic |
+| Harvesting station | 80 | 60, 100, 150 | 90 | - | both |
 | Research lab | 150 | - | 120 | `bionic` | bionic |
 | Missile silo | 120 | - | 100 | `bionic` | bionic |
 | Missile defence system | 100 | - | 140 | `bionic` | bionic |
@@ -203,7 +205,7 @@ All [official] unless noted, applied to weapons *and* spawn towers.
 `speed` = tiles/second. `spawnSeconds` = seconds one Basic/Special tower needs for one unit at level 0 (divide by `spawnMult`). `structureDamage` per hit (1 hit/s). `baseHits` = damage to a base on arrival, in units of "hits" (fractional allowed: a unit arriving dies; HUD shows `ceil`). `unlockCost` = Thorium to reach that output level. `radius` = crowd spacing.
 
 | Unit | tier | layer | hp | speed | structureDamage | baseHits | spawnSeconds | unlockCost | requires | radius |
-|---|---|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|---|
 | scout | basic | ground | 12 | 3.2 | 3 | 0.25 | 1.6 | 0 | null | 0.12 |
 | tank | basic | ground | 60 | 1.6 | 10 | 0.5 | 3.2 | 40 | `tank` | 0.2 |
 | drone | basic | air | 20 | 2.8 | 4 | 0.25 | 2.4 | 60 | `drone` | 0.14 |
@@ -233,8 +235,8 @@ Cross-checks [tuned]:
 Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**, **Kronos**, 8 areas each, areas 29-44), 10 battle maps in two new environments, new gameplay features, enhanced research upgrades, nuclear silos, behemoth swarm creatures and kamikaze drones. [observed] Trophy guide: Big Snake / Big Dragon trophies need 2-3 players; enemy research tower researches missile silos, silos build missiles, a Pulsar adjacent to a silo destroys it and chain-explodes neighbouring silos; area 41 (Kronos) shortcut opens by destroying key enemy structures. [observed] the user's notes (`pdf fondation general du jeu.pdf`, handwritten French):
 
 - **Spaceship recharging station** ("spawn, base" / player respawn): where the ship respawns/recharges; there is one per base, also acts as player spawn point. [notes] Tuned: if the ship is destroyed/disabled it respawns here after 5 s; carrying a rock drains energy that refills here.
-- **Harvesting station** ("produces money, player with rock"): passive Thorium generator that also processes rocks: a rock dropped on it yields +25 % Thorium and the station trickles 1 Thorium/2 s per level of nearby rocks (tuned: base 0.5 Thorium/s while a rock is within 3 tiles; cost 80).
-- **Research lab** ("unlocks new troop or upgrade"): costs Thorium to research an item in-game (tech keys such as `bionic`, `snake`, `dragon`, `silo`), taking `ResearchDef.cost` Thorium; research time 20 s; unlocks units/upgrades in Battle and for the AI. In campaign tech is also granted by areas.
+- **Harvesting station** ("produces money, player with rock"): the only way to turn rocks into Thorium. Its magnet (3 / 4 / 5 / 6.5 tiles by level) pulls in the nearest free rock and drains it; bigger rocks take longer and pay more (see §4). Available in both rulesets; cost 80.
+- **Research lab** ("unlocks new troop or upgrade"): costs Thorium to research an item in-game, taking `ResearchDef.cost` Thorium; research time 20 s; unlocks units/upgrades in Battle and for the AI. In campaign tech is also granted by areas. Implemented: the lab exists only in the Bionic Swarm ruleset; Bionic battles grant every base-game tech at start and the lab sells the Bionic research (`bionic: true` in `src/data/research.ts`): Snake Swarm `snakeSwarm` 140, Missile Defense `missileDefense` 150, Dragon Swarm `dragonSwarm` 180, Missile Silo `missileSilo` 200 [tuned]. These keys are not part of `ALL_TECH_KEYS` (the base/campaign set).
 - **Dragon** and **Snake**: super-units. Tuned: *Snake* = ground chain that merges 20 queued ground units into one long armoured ribbon (hp 500, damage on arrival 3 hits); *Dragon* = air equivalent (hp 350, fire breath, 5 hits). Visual snakes in screenshots [observed] are the unit trains themselves.
 - **Missile silo**: builds a long-range missile (build time 25 s, then ready); launch by selecting "missile" in the attack menu; missile travels 4 t/s straight at the target base or structure cluster, deals 3 base hits and a 3-tile splash on structures (100 dmg). Silos are vulnerable and chain-explode (damage 80 in radius 1.5 when destroyed while armed). Counter: **Missile defence system** (cost 100, range 7, hits missiles only, 1 shot/1.5 s, kills a missile in 2 shots) [tuned].
 - **Attack/defence classes** (HUD classification from the notes): **Ground**, **Air**, **Hybrid**, **Bomber**. Mapping used by the code: weapons/units are tagged by class: Ground = hits/is ground only (Turret, Pulsar; scout, tank, hammer...), Air = hits/is air only (Drone, Carrier, Dragon), Hybrid = hits both (Laser), Bomber = area-effect class (Bomber weapon, torpedo, missile). The HUD shows four small class icons next to each weapon/unit card. [tuned mapping of the note]
@@ -305,7 +307,7 @@ Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**,
 | # | Comet | Name | Teaches / focus | enemyHits | AI | Start | Par |
 |---|---|---|---|---|---|---|---|
 | 1 | Kreios | First Impact | build, upgrade, first attack; unlocks `tank` | 5 | 1 | 300 | 4:00 |
-| 2 | Kreios | Rock Fall | meteoroids, smash rocks for Thorium; unlocks `laser` | 8 | 1 | 300 | 5:00 |
+| 2 | Kreios | Rock Fall | meteoroids, harvest rocks for Thorium; unlocks `laser` | 8 | 1 | 300 | 5:00 |
 | 3 | Kreios | Crossroads | path manipulation (maze), `gateway` | 10 | 2 | 300 | 6:00 |
 | 4 | Kreios | Hold the Line | upgrades, recycle & repair, black corner marks | 12 | 2 | 320 | 6:30 |
 | 5 | Kreios | Hammer Time | Special Ops tower, `hammer` | 15 | 3 | 340 | 7:00 |

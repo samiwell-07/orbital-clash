@@ -12,9 +12,9 @@ import type { FrameInfo, ModelSystem } from './types';
 
 /** World radius per rock size (mechanics.md tuned rock model). */
 export const ROCK_RADIUS: readonly number[] = [0.4, 0.7, 1.1];
-const STATES: readonly RockState[] = ['drifting', 'landed', 'grabbed', 'smashed'];
-/** Base emissive of the thorium veins per state; grabbed/smashed also pulse. */
-const GLOW: Readonly<Record<RockState, number>> = { drifting: 1.4, landed: 1.9, grabbed: 3.4, smashed: 5 };
+const STATES: readonly RockState[] = ['drifting', 'landed', 'grabbed', 'harvesting', 'smashed'];
+/** Base emissive of the thorium veins per state; grabbed/harvesting/smashed also pulse. */
+const GLOW: Readonly<Record<RockState, number>> = { drifting: 1.4, landed: 1.9, grabbed: 3.4, harvesting: 4.2, smashed: 5 };
 const THORIUM = 0xd8ff3c;
 
 function rockBody(): BufferGeometry {
@@ -97,7 +97,8 @@ export class RockSystem implements ModelSystem {
     for (const v of this.veins) v.end();
     for (let s = 0; s < STATES.length; s++) {
       const st = STATES[s];
-      const pulse = st === 'grabbed' || st === 'smashed' ? 0.75 + 0.25 * Math.sin(f.now * (st === 'grabbed' ? 9 : 20)) : 0.9 + 0.1 * Math.sin(f.now * 2.5);
+      const fast = st === 'grabbed' ? 9 : st === 'harvesting' ? 14 : st === 'smashed' ? 20 : 0;
+      const pulse = fast > 0 ? 0.75 + 0.25 * Math.sin(f.now * fast) : 0.9 + 0.1 * Math.sin(f.now * 2.5);
       this.mats[s].emissiveIntensity = GLOW[st] * pulse;
     }
   }
@@ -119,10 +120,11 @@ export class RockSystem implements ModelSystem {
     if (this.axis.lengthSq() < 1e-4) this.axis.set(0, 1, 0);
     this.axis.normalize();
     const grabbed = r.state === 'grabbed';
-    const rate = grabbed ? 1.8 : 0.35 + 0.5 * h;
+    const harvesting = r.state === 'harvesting';
+    const rate = grabbed ? 1.8 : harvesting ? 2.6 : 0.35 + 0.5 * h;
     this.q.setFromAxisAngle(this.axis, r.spin + now * rate);
     const bob = Math.sin(now * 0.9 + h * 6.28) * 0.04;
-    const lift = grabbed ? 0.85 : rad * 0.55 + (r.state === 'landed' ? 0 : 0.12);
+    const lift = grabbed ? 0.85 : rad * 0.55 + (r.state === 'landed' ? 0 : harvesting ? 0.3 : 0.12);
     this.pos.set(r.x + r.vx * dt, lift + bob, r.y + r.vy * dt);
     const squash = r.state === 'smashed' ? 0.85 : 1;
     this.scl.set(rad * (0.9 + 0.2 * h) * squash, rad * (0.85 + 0.25 * hash01(r.id + 9)) * squash, rad * (0.9 + 0.2 * hash01(r.id + 4)) * squash);

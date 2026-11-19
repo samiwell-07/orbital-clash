@@ -7,6 +7,7 @@ import {
 } from '@/sim/modes/campaign';
 import { ALL_MISSIONS, getMission } from '@/data/areas';
 import { registerSeed } from '@/data/areas/seeds';
+import { canBuild } from '@/sim/build';
 
 registerSystem('test.production', STAGE_ORDER.production, productionSystem);
 
@@ -190,5 +191,48 @@ describe('area data sanity', () => {
     const m = getMission('kreios', 0)!;
     expect(m.teaches).toBe('tank');
     expect(m.unlocked).toEqual([]);
+  });
+});
+
+describe('taught tech', () => {
+  const techEvents = (ev: SimEvent[]) => ev.filter((e) => e.t === 'techUnlocked');
+
+  it('Rock Fall gives Player 0 Lasers at tick 0, buildable right away, with one player notice', () => {
+    const sim = make(getMission('kreios', 1)!);
+    const w = sim.world;
+    expect(w.players[0].tech.laser).toBe(true);
+    let tile: { tx: number; ty: number } | null = null;
+    for (let r = 1; r < 8 && !tile; r++) {
+      for (let dy = -r; dy <= r && !tile; dy++) {
+        for (let dx = -r; dx <= r && !tile; dx++) {
+          const tx = w.players[0].baseTx + dx, ty = w.players[0].baseTy + dy;
+          if (canBuild(w, 0, 'turret', tx, ty).ok) tile = { tx, ty };
+        }
+      }
+    }
+    expect(tile).not.toBeNull();
+    expect(canBuild(w, 0, 'laser', tile!.tx, tile!.ty).ok).toBe(true);
+    sim.step([]);
+    expect(techEvents(sim.drainEvents())).toEqual([{ t: 'techUnlocked', owner: 0, key: 'laser' }]);
+    sim.step([]);
+    expect(techEvents(sim.drainEvents())).toEqual([]);
+  });
+
+  it('First Impact gives Player 0 Tanks at the start', () => {
+    expect(make(getMission('kreios', 0)!).world.players[0].tech.tank).toBe(true);
+  });
+
+  it('every co-op human and the enemy get the taught tech', () => {
+    const w = make(getMission('kreios', 1)!, 'normal', 7, 2).world;
+    expect([0, 1, 2].map((id) => w.players[id].tech.laser)).toEqual([true, true, true]);
+  });
+
+  it('extra alien tech goes to the enemy only', () => {
+    const sim = make(getMission('kreios', 3)!);
+    sim.step([]);
+    const ev = techEvents(sim.drainEvents());
+    expect(ev).toContainEqual({ t: 'techUnlocked', owner: 1, key: 'pulsar' });
+    expect(ev.filter((e) => e.t === 'techUnlocked' && e.owner === 0)).toEqual([]);
+    expect(sim.world.players[0].tech.pulsar).toBeFalsy();
   });
 });

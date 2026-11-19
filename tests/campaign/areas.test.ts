@@ -5,6 +5,7 @@ import { createWorld } from '@/sim/core';
 import { compile, startCampaign, applyMissionSetup } from '@/sim/modes/campaign';
 import { ALL_MISSIONS, TEACH, getMission, missionSummaries, unlockedBefore } from '@/data/areas';
 import { ALL_TECH_KEYS } from '@/data';
+import { BINDING_ROWS } from '@/input/bindings';
 
 const DIFFS: Difficulty[] = ['beginner', 'casual', 'normal', 'expert'];
 
@@ -65,6 +66,23 @@ describe('authored areas', () => {
       if (m.resurgence) expect(m.hints).toHaveLength(0);
       else expect(m.hints.length).toBeGreaterThan(0);
     }
+  });
+
+  it('hints name controls as "(pad / key)" pairs that match one BINDING_ROWS row', () => {
+    const tokens = (s: string) => s.split(' / ').map((t) => t.replace(/\s*\(.*\)$/, '').replace(/^Hold /, '').trim());
+    const pairs = BINDING_ROWS.map((r) => ({ pad: tokens(r.pad), key: tokens(r.p1) }));
+    const bare = /\b(R1|R2|R3|L1|L2|L3|Shift|Tab|Esc|Start|Square|Triangle|Cross|Circle)\b|\b[A-Z]\s*\/\s*[A-Z]\b/;
+    let named = 0;
+    for (const m of ALL_MISSIONS) {
+      for (const h of m.hints) {
+        for (const [, pad, key] of h.matchAll(/\(([^()]+?) \/ ([^()]+?)\)/g)) {
+          named++;
+          expect(pairs.some((p) => p.pad.includes(pad) && p.key.includes(key)), `${m.id}: "${pad} / ${key}"`).toBe(true);
+        }
+        expect(h.replace(/\([^()]*\)/g, ''), `${m.id}: control named outside "(pad / key)"`).not.toMatch(bare);
+      }
+    }
+    expect(named).toBeGreaterThan(0);
   });
 
   it('tech gating is consistent across areas', () => {

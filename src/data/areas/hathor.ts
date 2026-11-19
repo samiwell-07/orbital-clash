@@ -6,7 +6,7 @@ const SPECS: readonly AreaSpec[] = [
   {
     name: 'Dune Gate', hits: 20, start: 380, par: 480, ai: 4,
     map: { w: 40, h: 26, style: 'lanes', layout: 'side', seed: 201, thorium: 3, rocks: 18 },
-    hints: ['Pulsars hit everything within one tile: put them on the front line.', 'Pulsars cannot smash rocks; keep a Turret or Laser nearby for Thorium.'],
+    hints: ['Pulsars hit everything within one tile: put them on the front line.', 'Lasers and Pulsars never touch rocks: only Harvesters turn them into Thorium.'],
   },
   {
     name: 'Sand Thieves', hits: 22, start: 380, par: 510, ai: 4,
@@ -16,7 +16,7 @@ const SPECS: readonly AreaSpec[] = [
   {
     name: 'Blast Radius', hits: 25, start: 400, par: 540, ai: 5,
     map: { w: 42, h: 26, style: 'plain', seed: 203, thorium: 2, rocks: 16, craters: 18 },
-    hints: ['Bombers splash everything in a column and also smash rocks.', 'Fast units slip past slow shells: pair Bombers with Pulsars.'],
+    hints: ['Bombers splash everything in a column.', 'Fast units slip past slow shells: pair Bombers with Pulsars.'],
   },
   {
     name: 'Mirage', hits: 25, start: 400, par: 540, ai: 5,

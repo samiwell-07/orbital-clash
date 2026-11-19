@@ -33,7 +33,9 @@ export function structureRules(kind: StructureKind): StructureRules {
     return { ...d, tower: false, bionicOnly: false };
   }
   const d = SUPPORT_DEFS[kind as keyof typeof SUPPORT_DEFS];
-  return { ...d, maxLevel: 0, upgradeCost: [], tower: false, bionicOnly: d.profile === 'bionic' };
+  return {
+    ...d, maxLevel: d.maxLevel ?? 0, upgradeCost: d.upgradeCost ?? [], tower: false, bionicOnly: d.profile === 'bionic',
+  };
 }
 
 /** Build cost plus every upgrade paid to reach `level`. */
@@ -55,7 +57,7 @@ export interface PlaceSpec {
   output?: UnitKind;
 }
 
-/** Preplaced structures skip tech, cost and path checks; scripted builds enforce all of them. */
+/** Preplaced structures skip tech and cost checks; scripted builds enforce them. Both never seal a human base. */
 export interface PlaceOpts {
   strict: boolean;
 }
@@ -82,11 +84,11 @@ export function placeStructure(w: World, owner: PlayerId, spec: PlaceSpec, opts:
     if (r.bionicOnly && w.settings.profile === 'base') return `${where}: bionic-profile structure`;
     const cost = costAtLevel(r, level);
     if (p.thorium < cost) return `${where}: costs ${cost} thorium but ${p.thorium} available`;
-    for (const h of humanIds(w)) {
-      if (w.players[h].baseBuilt && wouldBlockPath(w, tx, ty, h)) return `${where}: would seal a path to a base`;
-    }
-    p.thorium -= cost;
   }
+  for (const h of humanIds(w)) {
+    if (w.players[h].baseBuilt && wouldBlockPath(w, tx, ty, h)) return `${where}: would seal a path to a base`;
+  }
+  if (opts.strict) p.thorium -= costAtLevel(r, level);
   const s = addStructure(w, {
     kind, owner, tx, ty, level, hp: r.hp, maxHp: r.hp, output: output ?? null, scripted: p.controller === 'script',
   });
@@ -115,11 +117,25 @@ function release(w: World, owner: PlayerId, a: Extract<ScriptAction, { a: 'relea
     if (n > have) return `release ${k}: wants ${n} but only ${have} stored`;
     taken.push([k, n]);
   }
+  if (!ctx.dry) aimRelease(w, owner);
   for (const [k, n] of taken) {
     p.stored[k] = (p.stored[k] ?? 0) - n;
     if (!ctx.dry && releaseHandler) releaseHandler(w, owner, k, n, emit);
   }
   return null;
+}
+
+/**
+ * Co-op: scripted releases take turns between the living hostile bases (ascending player id), one
+ * release event each, so every human base faces waves. With a single human this is always that base.
+ */
+function aimRelease(w: World, owner: PlayerId): void {
+  const p = w.players[owner];
+  const targets = w.players.filter((q) => q.id !== owner && q.alive && q.baseBuilt && q.team !== p.team);
+  if (targets.length === 0) return;
+  const st = campaignState(w);
+  p.attack.targetPlayer = targets[st.releaseCursor % targets.length].id;
+  st.releaseCursor++;
 }
 
 /** Runs one scripted action. Returns an error text (a missing prerequisite) or null. Never skips silently. */

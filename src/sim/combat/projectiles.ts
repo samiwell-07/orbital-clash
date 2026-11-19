@@ -2,11 +2,8 @@ import type { Emit, Projectile, System, Unit, World } from '@/types';
 import { hitBase } from '@/sim/core';
 import { UNIT_DEFS } from '@/data';
 import { damageUnit, splashStructures, splashUnits } from './damage';
-import { hitRock } from './rocks';
-import { findRock, hostile, unitIndex } from './targeting';
-import {
-  IMPACT_FUSE, MISSILE_BASE_HITS, ROCK_RADIUS_BASE, ROCK_RADIUS_PER_SIZE, SHOT_FUSE, TORPEDO_BASE_HITS,
-} from './tuning';
+import { hostile, unitIndex } from './targeting';
+import { IMPACT_FUSE, MISSILE_BASE_HITS, SHOT_FUSE, TORPEDO_BASE_HITS } from './tuning';
 
 interface Loc {
   x: number;
@@ -29,11 +26,6 @@ function locate(w: World, p: Projectile, index: Map<number, Unit>): Loc | null {
     loc.x = s.tx + 0.5; loc.y = s.ty + 0.5; loc.radius = 0.5; loc.unit = null;
     return loc;
   }
-  const r = findRock(w, p.targetId);
-  if (r && r.state === 'drifting') {
-    loc.x = r.x; loc.y = r.y; loc.radius = ROCK_RADIUS_BASE + r.size * ROCK_RADIUS_PER_SIZE; loc.unit = null;
-    return loc;
-  }
   return null;
 }
 
@@ -47,15 +39,9 @@ function aim(p: Projectile, tx: number, ty: number): void {
   p.vy = (dy / d) * speed;
 }
 
-function strikeRock(w: World, p: Projectile, emit: Emit): void {
-  const r = p.targetId ? findRock(w, p.targetId) : undefined;
-  if (r) hitRock(w, r, p.owner, emit);
-}
-
 function stepBullet(w: World, p: Projectile, emit: Emit, t: Loc | null): boolean {
   if (t && Math.hypot(t.x - p.x, t.y - p.y) <= t.radius + 0.15) {
     if (t.unit) damageUnit(w, t.unit, p.damage, p.owner, emit);
-    else strikeRock(w, p, emit);
     return false;
   }
   return p.life > 0;
@@ -65,10 +51,6 @@ function detonateSplash(w: World, p: Projectile, emit: Emit): void {
   const radius = p.splash > 0 ? p.splash : 0.5;
   splashUnits(w, p.x, p.y, radius, p.damage, p.owner, p.layerMask, emit);
   emit({ t: 'explosion', x: p.x, y: p.y, radius, big: false });
-  const r = p.targetId ? findRock(w, p.targetId) : undefined;
-  if (r && r.state === 'drifting' && Math.hypot(r.x - p.x, r.y - p.y) <= radius + ROCK_RADIUS_BASE + r.size * ROCK_RADIUS_PER_SIZE) {
-    hitRock(w, r, p.owner, emit);
-  }
 }
 
 function stepSplash(w: World, p: Projectile, emit: Emit, t: Loc | null): boolean {

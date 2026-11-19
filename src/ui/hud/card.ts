@@ -47,7 +47,8 @@ function costsOf(kind: StructureKind): Costs {
     const d = SPAWN_TOWER_DEFS[kind];
     return { buildCost: d.buildCost, upgrade: d.upgradeCost, maxLevel: d.maxLevel };
   }
-  return { buildCost: DEFS.support(kind).buildCost, upgrade: [], maxLevel: 0 };
+  const d = DEFS.support(kind);
+  return { buildCost: d.buildCost, upgrade: d.upgradeCost ?? [], maxLevel: d.maxLevel ?? 0 };
 }
 
 /** Thorium put into a structure so far: build cost + the upgrades already bought. */

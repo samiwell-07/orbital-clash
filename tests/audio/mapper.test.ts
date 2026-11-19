@@ -37,6 +37,12 @@ describe('event mapping', () => {
     expect(soundsForEvent({ t: 'thorium', owner: 0, amount: 0 })).toEqual([]);
   });
 
+  it('plays the tech cue only for human-owned unlocks', () => {
+    const isHuman = (owner: number) => owner === 0;
+    expect(soundsForEvent({ t: 'techUnlocked', owner: 0, key: 'laser' }, isHuman)[0]?.[0]).toBe('upgrade');
+    expect(soundsForEvent({ t: 'techUnlocked', owner: 1, key: 'pulsar' }, isHuman)).toEqual([]);
+  });
+
   it('pans left/right from x', () => {
     const [l] = mapEvents([died(2)]);
     const [r] = mapEvents([died(MAP_W - 2)]);

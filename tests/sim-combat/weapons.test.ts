@@ -39,37 +39,15 @@ describe('weapons', () => {
     expect(w.events.some((e) => e.t === 'beam')).toBe(true);
   });
 
-  it('laser smashes a drifting rock and credits thorium via smashRock', () => {
+  it('no weapon ever shoots rocks', () => {
     const w = arena();
-    putWeapon(w, 'laser', 0, 5, 4);
-    const rock = addRock(w, { x: 7.5, y: 4.5, thorium: 20, size: 2 });
-    const before = w.players[0].thorium;
-    runCombat(w, 10);
-    expect(rock.state).toBe('smashed');
-    expect(w.players[0].thorium).toBeGreaterThan(before);
-    expect(w.events.some((e) => e.t === 'rockSmashed' && e.owner === 0)).toBe(true);
-  });
-
-  it('pulsar (no rock smashing) ignores rocks; turret bullet smashes one', () => {
-    const w = arena();
-    putWeapon(w, 'pulsar', 0, 5, 4);
-    const rock = addRock(w, { x: 6.5, y: 4.5, thorium: 20 });
-    runCombat(w, 60);
+    const guns = [putWeapon(w, 'turret', 0, 5, 4), putWeapon(w, 'laser', 0, 5, 5), putWeapon(w, 'bomber', 0, 5, 3), putWeapon(w, 'pulsar', 0, 4, 4)];
+    const rock = addRock(w, { x: 6.5, y: 4.5, thorium: 20, size: 2 });
+    runCombat(w, 120);
     expect(rock.state).toBe('drifting');
-    putWeapon(w, 'turret', 0, 5, 5);
-    runCombat(w, 60);
-    expect(rock.state).toBe('smashed');
+    expect(guns.map((s) => s.targetId)).toEqual([0, 0, 0, 0]);
+    expect(w.events.some((e) => e.t === 'rockSmashed' || e.t === 'shot' || e.t === 'beam')).toBe(false);
   });
-
-  it('prefers units over rocks', () => {
-    const w = arena();
-    const t = putWeapon(w, 'turret', 0, 5, 4);
-    addRock(w, { x: 6.5, y: 4.5, thorium: 5 });
-    const u = putUnit(w, 'tank', 1, 8.0, 4.5);
-    runCombat(w, 1);
-    expect(t.targetId).toBe(u.id);
-  });
-
   it('allied players never damage each other (direct, splash, projectiles)', () => {
     const w = arena(true);
     putWeapon(w, 'turret', 0, 5, 4);

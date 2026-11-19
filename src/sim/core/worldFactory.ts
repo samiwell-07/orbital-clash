@@ -64,7 +64,11 @@ export function createWorld(opts: NewGameOptions): World {
     p.thorium = p.alive && !scripted ? Math.round(baseThorium * diff.thorium * f) : 0;
     const hits = scripted && mission ? mission.enemyHits[settings.difficulty] : settings.maxHits * f;
     p.maxHits = clampHits(hits);
-    if (mission) for (const key of mission.unlocked) p.tech[key] = true;
+    if (mission) {
+      for (const key of mission.unlocked) p.tech[key] = true;
+      // The area's own tech is usable from the start by everyone in it (humans and the scripted enemy).
+      if (mission.teaches) p.tech[mission.teaches] = true;
+    }
 
     const bt = map.baseTiles[slot.id] ?? null;
     if (bt) {

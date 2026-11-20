@@ -43,6 +43,17 @@ export function makeMap(spec: MapSpec): MapDef {
   }
   for (const ridge of spec.ridges) draw(ridge, '#');
   for (const trench of spec.trenches) draw(trench, 'o');
+  const candidates: { tx: number; ty: number }[] = [];
+  for (let ty = 3; ty < size - 3; ty++) {
+    for (let tx = 3; tx < size - 3; tx++) {
+      if ([human, enemy, ...partners].some((b) => Math.max(Math.abs(b.tx - tx), Math.abs(b.ty - ty)) < 3)) continue;
+      if ([-1, 0, 1].every((dy) => [-1, 0, 1].every((dx) => rows[ty + dy][tx + dx] === '.'))) candidates.push({ tx, ty });
+    }
+  }
+  candidates.sort((a, b) => Math.hypot(a.tx - human.tx, a.ty - human.ty) - Math.hypot(b.tx - human.tx, b.ty - human.ty) || a.ty - b.ty || a.tx - b.tx);
+  const fourth = candidates[0];
+  if (!fourth) throw new Error(`${id}: no clear pad for the fourth co-op player`);
+  partners.push(fourth);
   return {
     id, name, palette, w: size, h: size, rows: rows.map((r) => r.join('')),
     baseTiles: [human, enemy, ...partners], thoriumLevel: spec.thorium, rockCount: spec.rocks,

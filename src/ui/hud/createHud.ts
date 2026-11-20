@@ -40,7 +40,7 @@ function panelOrder(world: World): Player[] {
   const active = world.players.filter((p) => p.controller !== 'none');
   const ai = active.filter((p) => p.controller !== 'human');
   const humans = active.filter((p) => p.controller === 'human');
-  return [...ai, ...humans].slice(0, 4);
+  return [...ai, ...humans];
 }
 
 export function createHud(opts: HudOptions = {}): Hud {

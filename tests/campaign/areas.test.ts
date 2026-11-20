@@ -88,7 +88,7 @@ describe('authored areas', () => {
   it('places bases on clear pads far apart, keeping every route open', () => {
     for (const rows of ROCK_GRIDS.values()) {
       const [human, enemy, ...partners] = placeBases(rows);
-      expect(partners).toHaveLength(2);
+      expect(partners).toHaveLength(3);
       for (const b of [human, enemy, ...partners]) {
         for (let dy = -1; dy <= 1; dy++) expect(rows[b.ty + dy].slice(b.tx - 1, b.tx + 2)).toBe('...');
       }

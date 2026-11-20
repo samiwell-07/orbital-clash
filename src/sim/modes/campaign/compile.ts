@@ -1,4 +1,5 @@
 import type { Difficulty, Emit, Mission, ScriptAction, World } from '@/types';
+import { PLAYER_IDS } from '@/types';
 import { SPAWN_TOWER_DEFS, UNIT_DEFS, ALL_TECH_KEYS } from '@/data';
 import { MAX_COOP_PLAYERS, TICK_HZ } from '@/config/constants';
 import { createWorld, pathExists } from '@/sim/core';
@@ -57,7 +58,7 @@ function convert(m: Mission, difficulty: Difficulty, errors: string[]): Compiled
       errors.push(`event #${index}: invalid time ${String(e.atSec)}`);
       return;
     }
-    if (![0, 1, 2, 3].includes(e.player)) {
+    if (!PLAYER_IDS.includes(e.player)) {
       errors.push(`event #${index}: invalid player ${String(e.player)}`);
       return;
     }

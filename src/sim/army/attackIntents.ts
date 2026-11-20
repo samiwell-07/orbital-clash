@@ -3,8 +3,8 @@ import type { Intent, PlayerId, World, Emit } from '@/types';
 /** Next living enemy-team player after `from` (cyclic by id), or `from` when there is none. */
 export function nextEnemy(w: World, owner: PlayerId, from: PlayerId): PlayerId {
   const me = w.players[owner];
-  for (let i = 1; i <= 4; i++) {
-    const t = ((from + i) % 4) as PlayerId;
+  for (let i = 1; i <= w.players.length; i++) {
+    const t = w.players[(from + i) % w.players.length].id;
     const q = w.players[t];
     if (q.alive && q.team !== me.team) return t;
   }

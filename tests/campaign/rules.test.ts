@@ -19,7 +19,7 @@ function make(difficulty: Difficulty = 'normal', humans = 1, objectives?: Object
 describe('startCampaign', () => {
   it('sets up slots, teams, hits and start thorium per difficulty and player count', () => {
     const { w } = make('expert', 3);
-    expect(w.players.map((p) => p.controller)).toEqual(['human', 'script', 'human', 'human']);
+    expect(w.players.map((p) => p.controller)).toEqual(['human', 'script', 'human', 'human', 'none']);
     expect(w.players[0].team).toBe(w.players[3].team);
     expect(w.players[1].team).not.toBe(w.players[0].team);
     expect(w.players[1].maxHits).toBe(base.enemyHits.expert);

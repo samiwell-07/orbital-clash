@@ -15,7 +15,7 @@ const states = new WeakMap<World, Release>();
 function stateFor(w: World): Release {
   let s = states.get(w);
   if (!s) {
-    s = { acc: [0, 0, 0, 0], tail: [null, null, null, null] };
+    s = { acc: w.players.map(() => 0), tail: w.players.map(() => null) };
     states.set(w, s);
   }
   return s;
@@ -30,8 +30,8 @@ function validTarget(w: World, p: Player, t: PlayerId): boolean {
 export function resolveTarget(w: World, p: Player): PlayerId | -1 {
   const cur = p.attack.targetPlayer;
   if (validTarget(w, p, cur)) return cur;
-  for (let i = 1; i <= 4; i++) {
-    const t = ((cur + i) % 4) as PlayerId;
+  for (let i = 1; i <= w.players.length; i++) {
+    const t = w.players[(cur + i) % w.players.length].id;
     if (validTarget(w, p, t)) {
       p.attack.targetPlayer = t;
       return t;

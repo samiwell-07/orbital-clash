@@ -1,4 +1,5 @@
 import type { CometId, Difficulty } from '../types';
+import { MAX_COOP_PLAYERS } from '../config/constants';
 import type { Rank } from './rank';
 import { RANKS } from './rank';
 import { DEFAULT_SETTINGS, sanitizeSettings } from './settings';
@@ -87,7 +88,7 @@ function sanitizeArea(raw: unknown): AreaRecord | null {
     bestRank: RANKS.includes(r.bestRank as Rank) ? (r.bestRank as Rank) : 'D',
     bestScore: Math.max(0, r.bestScore),
     lastDifficulty: DIFFICULTIES.includes(r.lastDifficulty as Difficulty) ? (r.lastDifficulty as Difficulty) : 'normal',
-    coopPlayers: finite(r.coopPlayers) ? Math.min(3, Math.max(1, Math.round(r.coopPlayers))) : 1,
+    coopPlayers: finite(r.coopPlayers) ? Math.min(MAX_COOP_PLAYERS, Math.max(1, Math.round(r.coopPlayers))) : 1,
   };
 }
 
@@ -105,7 +106,7 @@ function sanitizeLastPlayed(raw: unknown): LastPlayed | null {
     index: Math.min(AREAS_PER_COMET - 1, Math.max(0, Math.floor(r.index))),
     resurgence: r.resurgence === true,
     difficulty: DIFFICULTIES.includes(r.difficulty as Difficulty) ? (r.difficulty as Difficulty) : 'normal',
-    coopPlayers: finite(r.coopPlayers) ? Math.min(3, Math.max(1, Math.round(r.coopPlayers))) : 1,
+    coopPlayers: finite(r.coopPlayers) ? Math.min(MAX_COOP_PLAYERS, Math.max(1, Math.round(r.coopPlayers))) : 1,
   };
 }
 

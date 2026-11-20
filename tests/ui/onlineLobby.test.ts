@@ -143,7 +143,7 @@ describe('multiplayer menu', () => {
     expect(battle.id).toBe('battle');
     expect(t.draw(battle)).toContain('Player 2 · Team');
     t.step(mp, [], { down: true });
-    expect(pushed(t.step(mp, [], { confirm: true }))).toBe('campaign');
+    expect(pushed(t.step(mp, [], { confirm: true }))).toBe('campaign-packs');
     t.step(mp, [], { down: true });
     expect(pushed(t.step(mp, [], { confirm: true }))).toBe('joinOnline');
 
@@ -157,7 +157,6 @@ describe('multiplayer menu', () => {
   it('a co-op lobby created from Multiplayer opens the room once, without pressing Y / R', () => {
     const t = setup();
     const briefing = createBriefingScreen(placeholderArea({ cometId: 'kreios', index: 0, resurgence: false }), { online: true });
-    t.step(briefing, [], { down: true });
     const out = t.step(briefing, [], { confirm: true });
     const lobby = (out as { screen: Screen }).screen;
     t.step(lobby);

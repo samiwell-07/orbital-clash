@@ -1,4 +1,5 @@
 import type { VideoLayout } from '../meta/settings';
+import { PLAYER_IDS } from '../types';
 
 export interface Rect {
   x: number;
@@ -51,7 +52,7 @@ export function safeArea(w: number, h: number, mode: VideoLayout): Rect {
 export function computeHudLayout(w: number, h: number, mode: VideoLayout, panelCount: number): HudLayout {
   const safe = safeArea(w, h, mode);
   const s = safe.h / 1030;
-  const n = Math.max(0, Math.min(4, panelCount));
+  const n = Math.max(0, Math.min(PLAYER_IDS.length, panelCount));
   const panels: Rect[] = [];
 
   if (mode === '16:9') {

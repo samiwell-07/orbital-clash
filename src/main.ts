@@ -1,30 +1,9 @@
-import { CANVAS_H, CANVAS_W } from './core/config';
-import { Renderer } from './ui/Renderer';
-import { Input } from './core/Input';
-import { AudioFx } from './core/Audio';
-import { Game } from './core/Game';
-import { GameLoop } from './core/GameLoop';
+import './style.css';
 
-const canvas = document.querySelector<HTMLCanvasElement>('#game');
-if (!canvas) throw new Error('Canvas #game not found');
+import { createApp } from './app/createApp';
 
-function fitCanvas(el: HTMLCanvasElement): void {
-  const scale = Math.min(window.innerWidth / CANVAS_W, window.innerHeight / CANVAS_H);
-  el.style.width = `${Math.floor(CANVAS_W * scale)}px`;
-  el.style.height = `${Math.floor(CANVAS_H * scale)}px`;
-}
+const gl = document.getElementById('game') as HTMLCanvasElement;
+const hud = document.getElementById('hud') as HTMLCanvasElement;
+const app = createApp({ gl, hud });
 
-const renderer = new Renderer(canvas);
-const input = new Input(canvas);
-const audio = new AudioFx();
-const game = new Game(renderer, input, audio);
-const loop = new GameLoop(
-  (dt) => game.update(dt),
-  (fps) => game.render(fps),
-  () => input.endFrame(),
-);
-
-fitCanvas(canvas);
-window.addEventListener('resize', () => fitCanvas(canvas));
-canvas.focus();
-loop.start();
+(window as unknown as { orbital: typeof app }).orbital = app;

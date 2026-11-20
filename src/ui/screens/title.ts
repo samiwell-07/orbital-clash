@@ -1,0 +1,50 @@
+import { COLORS, drawText } from '../theme';
+import { Form, buttonRows } from '../menus/form';
+import { drawForm } from '../menus/formDraw';
+import { drawFooter } from './common';
+import { createBattleScreen } from './battle';
+import { createCampaignPacks } from './campaignPacks';
+import { createControlsScreen } from './controls';
+import { createLeaderboardsScreen } from './leaderboards';
+import { drawLogo } from './logo';
+import { createMultiplayerScreen } from './multiplayer';
+import { createSettingsScreen } from './settings';
+import { createTrophiesScreen } from './trophies';
+import type { Screen } from './types';
+
+const ITEMS = [
+  { id: 'campaign', label: 'Campaign', icon: 'comet' },
+  { id: 'battle', label: 'Battle', icon: 'sword' },
+  { id: 'multiplayer', label: 'Multiplayer', icon: 'players' },
+  { id: 'settings', label: 'Settings', icon: 'gear' },
+  { id: 'controls', label: 'Controls', icon: 'gamepad' },
+  { id: 'leaderboards', label: 'Leaderboards', icon: 'star' },
+  { id: 'trophies', label: 'Trophies', icon: 'trophy' },
+];
+
+export function createTitleScreen(): Screen {
+  const form = new Form(buttonRows(ITEMS));
+  return {
+    id: 'title',
+    update(nav, dt) {
+      const ev = form.handle(nav, dt);
+      switch (ev.activated) {
+        case 'campaign': return { t: 'push', screen: createCampaignPacks() };
+        case 'battle': return { t: 'push', screen: createBattleScreen() };
+        case 'multiplayer': return { t: 'push', screen: createMultiplayerScreen() };
+        case 'settings': return { t: 'push', screen: createSettingsScreen() };
+        case 'controls': return { t: 'push', screen: createControlsScreen() };
+        case 'leaderboards': return { t: 'push', screen: createLeaderboardsScreen() };
+        case 'trophies': return { t: 'push', screen: createTrophiesScreen() };
+        default: return null;
+      }
+    },
+    draw(g, size, now, ctx) {
+      drawLogo(g, size.w / 2, size.h * 0.24, size.w / 1920 * 1.05, now);
+      const bw = 400;
+      drawForm(g, form, { x: (size.w - bw) / 2, y: size.h * 0.5, w: bw, h: size.h * 0.46 }, now, { rowH: 46, gap: 8 });
+      drawText(g, 'v1.0  ·  an original homage to the PS3 classic', size.w / 2, size.h - 92, { size: 14, color: COLORS.dim, align: 'center' });
+      drawFooter(g, size.h, ctx.data.save.settings.controlsDisplay, [{ key: 'move', label: 'Select' }, { key: 'confirm', label: 'Confirm' }]);
+    },
+  };
+}

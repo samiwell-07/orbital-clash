@@ -1,21 +1,22 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "useDefineForClassFields": true,
     "module": "ESNext",
+    "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "moduleResolution": "bundler",
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
     "strict": true,
+    "noUncheckedIndexedAccess": false,
     "noUnusedLocals": true,
-    "noFallthroughCasesInSwitch": true,
+    "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "noImplicitOverride": true,
-    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
     "skipLibCheck": true,
-    "types": ["vite/client"]
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "server", "tests", "vite.config.ts"]
 }

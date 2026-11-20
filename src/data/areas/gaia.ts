@@ -1,0 +1,81 @@
+import { swarmMission, type SwarmArea } from './swarm';
+
+const areas: readonly SwarmArea[] = [
+  {
+    name: 'Glassroot Nursery', hits: 35, start: 540, par: 420,
+    map: { size: 26, thorium: 3, rocks: 18,
+      ridges: [[11, 3, 11, 9], [3, 13, 8]], trenches: [[10, 15, 13]] },
+    briefing: 'Something in the nursery has chewed through the glass. The tracks lead back to a growing pen.',
+    hints: ['The snakes follow the ground lanes. Cover the break between the roots, then buy swarm research at the lab beside your pad.'],
+    salvage: 'researchLab',
+    installation: 'researchLab', garrison: ['turret', 'laser'], reinforcements: [[62, 'turret'], [175, 'pulsar']],
+    waves: [[50, { snake: 3 }], [110, { scout: 12, snake: 5 }], [202, { tank: 8 }], [320, { snake: 14, tank: 10 }]],
+  },
+  {
+    name: 'Silt Exchange', hits: 39, start: 470, par: 450,
+    map: { size: 27, layout: 'side', thorium: 3, rocks: 22,
+      ridges: [[10, 4, 10, 15], [2, 5, 6]], trenches: [[12, 8, 15], [4, 20, 7]] },
+    briefing: 'The exchange has struck a rich seam. Bring the ore home before the convoy does.',
+    hints: ['A thief escort follows the first scouts. Keep a weapon at the bend while you work the rocks.'],
+    alt: { id: 'shipment', type: 'thorium', text: 'Or collect 1,500 thorium for the exchange', value: 1500 },
+    installation: 'researchLab', garrison: ['laser', 'turret'], reinforcements: [[46, 'laser'], [160, 'pulsar']],
+    waves: [[38, { scout: 15 }], [90, { thief: 6, snake: 5 }], [182, { thief: 11 }], [310, { snake: 16, thief: 8 }]],
+  },
+  {
+    name: 'Bellflower Shelf', hits: 42, start: 520, par: 480,
+    map: { size: 28, thorium: 2, rocks: 16,
+      ridges: [[2, 12, 11, 15], [15, 4, 21]], trenches: [[5, 19, 10], [14, 8, 14, 11]] },
+    briefing: 'The bells are seed pods. Each one opens onto clear sky, not the winding path below.',
+    hints: ['Dragons fly over the shelf. Keep a bomber near the base instead of guarding only the ground route.'],
+    installation: 'researchLab', garrison: ['bomber', 'laser'], reinforcements: [[95, 'laser'], [245, 'turret']],
+    waves: [[55, { drone: 7 }], [125, { dragon: 4 }], [210, { snake: 10, drone: 12 }], [355, { dragon: 12, tank: 9 }]],
+  },
+  {
+    name: 'Ringwood Survey', hits: 45, start: 490, par: 500,
+    map: { size: 29, layout: 'side', thorium: 2, rocks: 15,
+      ridges: [[9, 8, 12, 12], [13, 2, 13, 5]], trenches: [[10, 20, 16, 23], [2, 4, 6]] },
+    briefing: 'The survey needs seven minutes of quiet telemetry. Keep the receiver on the air or uproot the colony.',
+    hints: ['The survey clock keeps running while you defend. Save a reserve for the last flight.'],
+    alt: { id: 'survey', text: 'Or defend the survey for seven minutes', type: 'survive', value: 420 },
+    installation: 'missileDefense', garrison: ['turret', 'pulsar'], reinforcements: [[70, 'bomber'], [142, 'pulsar'], [285, 'laser']],
+    waves: [[45, { snake: 8 }], [115, { hammer: 7, tank: 6 }], [232, { dragon: 8 }], [340, { switch: 9, snake: 16 }], [385, { dragon: 12 }]],
+  },
+  {
+    name: 'Rain Ladder', hits: 49, start: 540, par: 530,
+    map: { size: 29, thorium: 2, rocks: 17,
+      ridges: [[2, 11, 9], [2, 15, 12], [2, 19, 8]], trenches: [[12, 4, 15, 7]] },
+    briefing: 'Three terraces feed the same sluice. The column has to turn at each terrace; the escorts do not.',
+    hints: ['Use the terrace ends for ground coverage and keep air defence on the direct line between bases.'],
+    installation: 'researchLab', garrison: ['turret', 'laser', 'pulsar'], reinforcements: [[65, 'laser'], [215, 'bomber']],
+    waves: [[44, { tank: 9 }], [104, { dragon: 7 }], [190, { snake: 16, hammer: 6 }], [312, { dragon: 10, drone: 16 }], [456, { tank: 20, snake: 18 }]],
+  },
+  {
+    name: 'Graftworks', hits: 54, start: 590, par: 560,
+    map: { size: 30, layout: 'side', thorium: 2, rocks: 16,
+      ridges: [[9, 3, 9, 10, 13], [11, 18, 14, 22]], trenches: [[3, 6, 6], [14, 13, 15]] },
+    briefing: 'Each grafting station feeds another pen. Break six installations and the works must be abandoned.',
+    hints: ['The front towers count toward the demolition objective. Send Hammers before the pens can reinforce.'],
+    alt: { id: 'works', type: 'destroyStructures', text: 'Or dismantle six enemy structures', value: 6 },
+    installation: 'missileDefense', garrison: ['laser', 'pulsar', 'laser'], reinforcements: [[55, 'turret'], [121, 'bomber'], [248, 'pulsar']],
+    waves: [[48, { snake: 10, scout: 10 }], [116, { torpedo: 7 }], [222, { dragon: 9, thief: 6 }], [340, { snake: 22 }], [470, { torpedo: 15, dragon: 14 }]],
+  },
+  {
+    name: 'The Last Cotyledon', hits: 60, start: 620, par: 600,
+    map: { size: 30, thorium: 2, rocks: 18,
+      ridges: [[3, 12, 11, 16, 7], [14, 3, 19, 6]], trenches: [[11, 22, 14], [12, 9, 14]] },
+    briefing: 'The last seed leaf is folding. Two broods have returned to protect the husk.',
+    hints: ['The first brood crawls, the second flies. Keep both lines supplied during the lull between hatches.'],
+    installation: 'missileDefense', garrison: ['pulsar', 'laser', 'bomber'], reinforcements: [[70, 'pulsar'], [162, 'laser'], [300, 'bomber']],
+    waves: [[50, { snake: 13 }], [108, { dragon: 8 }], [190, { snake: 18, tank: 10 }], [280, { drone: 18, dragon: 12 }], [395, { hammer: 11, snake: 22 }], [510, { dragon: 18, snake: 20 }]],
+  },
+];
+
+export const GAIA_AREAS = areas.map((s, i) => swarmMission('gaia', i, s));
+export const GAIA_RESURGENCE = swarmMission('gaia', 0, {
+  name: 'Gaia Resurgence', hits: 78, start: 530, par: 700,
+  map: { size: 30, layout: 'side', thorium: 1, rocks: 10,
+    ridges: [[10, 2, 10, 19], [13, 6, 16]], trenches: [[3, 5, 7], [12, 22, 14, 25]] },
+  briefing: 'A second root system runs beneath the survey stakes. All the empty pens are moving again.',
+  installation: 'missileDefense', garrison: ['pulsar', 'bomber', 'turret'], reinforcements: [[38, 'laser'], [110, 'pulsar'], [180, 'bomber'], [315, 'laser']],
+  waves: [[30, { snake: 12 }], [85, { dragon: 10, drone: 12 }], [160, { thief: 10, snake: 18 }], [248, { tank: 18, dragon: 16 }], [360, { hammer: 12, snake: 24 }], [490, { dragon: 24 }], [600, { snake: 30, dragon: 18 }]],
+}, true);

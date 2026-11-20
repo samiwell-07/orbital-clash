@@ -1,133 +1,125 @@
-/** Shared visual helpers for the neon sci-fi look. */
+import { ownerColor, paletteColor } from '../config/playerColors';
 
-export const FONT_FAMILY = '"Orbitron", "Segoe UI", system-ui, sans-serif';
+export type Ctx = CanvasRenderingContext2D;
 
-/** CSS font string, e.g. font(14, 700). */
-export function font(size: number, weight: number | string = 600): string {
-  return `${weight} ${size}px ${FONT_FAMILY}`;
+export const COLORS = {
+  panel: '#0b0c10',
+  panelEdge: '#2b2f3a',
+  plate: '#16181d',
+  text: '#e9ecef',
+  dim: '#8b93a7',
+  hp: '#37e24a',
+  hpTrack: '#0d3a14',
+  thorium: '#ffd23c',
+  units: '#27c6e8',
+  unitsTrack: '#06303a',
+  danger: '#ff4a4a',
+  cyan: '#38e8ff',
+  ok: '#66ff9a',
+  lock: '#ffd23c',
+  space0: '#05060f',
+  space1: '#16102b',
+} as const;
+
+export const FONT_UI = "'Orbitron','Eurostile','Segoe UI',sans-serif";
+
+export function hex(n: number): string {
+  return '#' + (n & 0xffffff).toString(16).padStart(6, '0');
 }
 
-/** Runs `fn` with a canvas shadow glow, restoring the previous state. Use sparingly (shadowBlur is expensive). */
-export function withGlow(ctx: CanvasRenderingContext2D, color: string, blur: number, fn: () => void): void {
-  const prevColor = ctx.shadowColor;
-  const prevBlur = ctx.shadowBlur;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = blur;
-  fn();
-  ctx.shadowColor = prevColor;
-  ctx.shadowBlur = prevBlur;
+/** CSS colour of an owner (player id), following the lobby colour choice. */
+export function playerColor(p: number): string {
+  return hex(ownerColor(((p % 4) + 4) % 4));
 }
 
-/** Adds a rounded-rect sub-path (call beginPath() first if needed). */
-export function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
-  ctx.moveTo(x + rr, y);
-  ctx.lineTo(x + w - rr, y);
-  ctx.arcTo(x + w, y, x + w, y + rr, rr);
-  ctx.lineTo(x + w, y + h - rr);
-  ctx.arcTo(x + w, y + h, x + w - rr, y + h, rr);
-  ctx.lineTo(x + rr, y + h);
-  ctx.arcTo(x, y + h, x, y + h - rr, rr);
-  ctx.lineTo(x, y + rr);
-  ctx.arcTo(x, y, x + rr, y, rr);
-  ctx.closePath();
+/** CSS colour of a palette index (lobby swatches, team labels); not remapped by owner. */
+export function paletteCss(index: number): string {
+  return hex(paletteColor(index));
 }
 
-/** Adds a rect sub-path with 45° cut corners (sci-fi frame). */
-export function angledRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, cut: number): void {
-  const c = Math.max(0, Math.min(cut, w / 2, h / 2));
-  ctx.moveTo(x + c, y);
-  ctx.lineTo(x + w - c, y);
-  ctx.lineTo(x + w, y + c);
-  ctx.lineTo(x + w, y + h - c);
-  ctx.lineTo(x + w - c, y + h);
-  ctx.lineTo(x + c, y + h);
-  ctx.lineTo(x, y + h - c);
-  ctx.lineTo(x, y + c);
-  ctx.closePath();
-}
-
-/** Adds a regular polygon sub-path centered at (x, y). */
-export function polygonPath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, sides: number, rot = 0): void {
-  for (let i = 0; i < sides; i++) {
-    const a = rot + (i / sides) * Math.PI * 2;
-    const px = x + Math.cos(a) * r;
-    const py = y + Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-}
-
-/** Linear mix of two '#rrggbb' colors. */
-export function mixHex(a: string, b: string, t: number): string {
-  const na = parseInt(a.slice(1), 16);
-  const nb = parseInt(b.slice(1), 16);
-  const r = Math.round(((na >> 16) & 255) * (1 - t) + ((nb >> 16) & 255) * t);
-  const g = Math.round(((na >> 8) & 255) * (1 - t) + ((nb >> 8) & 255) * t);
-  const bl = Math.round((na & 255) * (1 - t) + (nb & 255) * t);
-  return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
-}
-
-/** '#rrggbb' + alpha -> 'rgba(...)'. Non-hex inputs are returned unchanged. */
-export function rgba(hex: string, a: number): string {
-  if (hex.length !== 7 || hex[0] !== '#') return hex;
-  const n = parseInt(hex.slice(1), 16);
+/** Accepts '#rrggbb'. */
+export function rgba(color: string, a: number): string {
+  const n = parseInt(color.slice(1, 7), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-const GLOW_SPRITE_SIZE = 64;
-const glowCache = new Map<string, HTMLCanvasElement>();
+export function font(px: number, weight: number | string = 600): string {
+  return `${weight} ${Math.round(px)}px ${FONT_UI}`;
+}
 
-/** Cached soft radial glow sprite (any CSS color), 64x64. */
-export function glowSprite(color: string): HTMLCanvasElement {
-  let c = glowCache.get(color);
-  if (c) return c;
-  c = document.createElement('canvas');
-  c.width = GLOW_SPRITE_SIZE;
-  c.height = GLOW_SPRITE_SIZE;
-  const g = c.getContext('2d');
-  if (g) {
-    const h = GLOW_SPRITE_SIZE / 2;
-    const grad = g.createRadialGradient(h, h, 0, h, h, h);
-    grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.25, 'rgba(255,255,255,0.55)');
-    grad.addColorStop(0.6, 'rgba(255,255,255,0.15)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, GLOW_SPRITE_SIZE, GLOW_SPRITE_SIZE);
-    g.globalCompositeOperation = 'source-in';
-    g.fillStyle = color;
-    g.fillRect(0, 0, GLOW_SPRITE_SIZE, GLOW_SPRITE_SIZE);
+export type Align = 'left' | 'center' | 'right';
+
+export interface TextOpts {
+  size: number;
+  color?: string;
+  glow?: string;
+  align?: Align;
+  weight?: number | string;
+  /** Letter spacing in px (ignored by browsers without ctx.letterSpacing). */
+  spacing?: number;
+  alpha?: number;
+  baseline?: CanvasTextBaseline;
+}
+
+export function drawText(ctx: Ctx, text: string, x: number, y: number, o: TextOpts): void {
+  ctx.save();
+  ctx.font = font(o.size, o.weight ?? 600);
+  ctx.textAlign = o.align ?? 'left';
+  ctx.textBaseline = o.baseline ?? 'middle';
+  ctx.globalAlpha *= o.alpha ?? 1;
+  ctx.letterSpacing = `${o.spacing ?? 0}px`;
+  if (o.glow) {
+    ctx.shadowColor = o.glow;
+    ctx.shadowBlur = o.size * 0.6;
   }
-  glowCache.set(color, c);
-  return c;
+  ctx.fillStyle = o.color ?? COLORS.text;
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }
 
-/** Draws a cached glow of `radius` px centered at (x, y). Caller chooses the composite mode. */
-export function drawGlow(ctx: CanvasRenderingContext2D, color: string, x: number, y: number, radius: number, alpha = 1): void {
-  if (alpha <= 0 || radius <= 0) return;
-  const prev = ctx.globalAlpha;
-  ctx.globalAlpha = prev * Math.min(1, alpha);
-  ctx.drawImage(glowSprite(color), x - radius, y - radius, radius * 2, radius * 2);
-  ctx.globalAlpha = prev;
+/** Text with a soft outer glow: two passes so the core stays crisp. */
+export function glowText(ctx: Ctx, text: string, x: number, y: number, o: TextOpts & { glow: string }): void {
+  drawText(ctx, text, x, y, { ...o, alpha: (o.alpha ?? 1) * 0.9 });
+  drawText(ctx, text, x, y, { ...o, glow: undefined });
 }
 
-/** Deterministic 0..1 hash of two integers (+ salt). */
-export function hash2(a: number, b: number, salt = 0): number {
-  let h = (a * 374761393 + b * 668265263 + salt * 2147483647) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
+export function measure(ctx: Ctx, text: string, size: number, weight: number | string = 600, spacing = 0): number {
+  ctx.save();
+  ctx.font = font(size, weight);
+  ctx.letterSpacing = `${spacing}px`;
+  const w = ctx.measureText(text).width;
+  ctx.restore();
+  return w;
 }
 
-export function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
+/** Rounded rectangle with chamfered (cut) corners, like the border frame in the references. */
+export function chamferPath(ctx: Ctx, x: number, y: number, w: number, h: number, c: number): void {
+  const k = Math.min(c, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + k, y);
+  ctx.lineTo(x + w - k, y);
+  ctx.lineTo(x + w, y + k);
+  ctx.lineTo(x + w, y + h - k);
+  ctx.lineTo(x + w - k, y + h);
+  ctx.lineTo(x + k, y + h);
+  ctx.lineTo(x, y + h - k);
+  ctx.lineTo(x, y + k);
+  ctx.closePath();
 }
 
-export function easeOutBack(t: number): number {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  const u = t - 1;
-  return 1 + c3 * u * u * u + c1 * u * u;
+export function wrapText(ctx: Ctx, text: string, maxW: number, size: number, weight: number | string = 500): string[] {
+  ctx.save();
+  ctx.font = font(size, weight);
+  const out: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(next).width > maxW) {
+      out.push(line);
+      line = word;
+    } else line = next;
+  }
+  if (line) out.push(line);
+  ctx.restore();
+  return out;
 }

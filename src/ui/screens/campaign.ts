@@ -1,5 +1,5 @@
 import { COMET_ORDER, EXPANSION_ORDER, AREAS_PER_COMET } from '../../meta/saveSchema';
-import type { CometId } from '../../types';
+import type { CometId, Difficulty } from '../../types';
 import { getArea, isAreaUnlocked, isCometUnlocked } from '../../meta/save';
 import { researchDef } from '../../data';
 import { COLORS, drawText, rgba } from '../theme';
@@ -13,7 +13,13 @@ import { findArea, moveCursor, nodeAt, placeholderArea, resurgenceIndices, rowLe
 import type { OnlineOption } from './battle';
 import type { Screen } from './types';
 
-export function createCampaignScreen(opts: OnlineOption & { expansion?: boolean } = {}): Screen {
+export interface CampaignOptions extends OnlineOption {
+  expansion?: boolean;
+  difficulty?: Difficulty;
+  players?: number;
+}
+
+export function createCampaignScreen(opts: CampaignOptions = {}): Screen {
   const order: readonly CometId[] = opts.expansion ? EXPANSION_ORDER : COMET_ORDER;
   let cursor: MapCursor = { row: 0, col: 0 };
   let started = false;

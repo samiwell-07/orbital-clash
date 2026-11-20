@@ -21,8 +21,8 @@ function missileTarget(w: World, player: PlayerId): Player | null {
   const valid = (q: Player | undefined): q is Player => !!q && q.alive && q.baseBuilt && hostile(w, player, q.id);
   const first = w.players[me.attack.targetPlayer];
   if (valid(first)) return first;
-  for (let i = 1; i <= 4; i++) {
-    const q = w.players[(me.attack.targetPlayer + i) % 4];
+  for (let i = 1; i <= w.players.length; i++) {
+    const q = w.players[(me.attack.targetPlayer + i) % w.players.length];
     if (valid(q)) return q;
   }
   return null;

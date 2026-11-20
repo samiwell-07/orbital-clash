@@ -57,6 +57,8 @@ export function drawPlayerPanel(ctx: Ctx, p: PanelProps): void {
   const lead = p.world.players.find((q) => q.team === player.team) ?? player;
   drawPlayerGlyph(ctx, { x: r.x + pad, y: r.y + (r.h - gs) / 2, w: gs, h: gs }, player.id, {
     enemy: !human, team: lead.colorIndex, alive: player.alive, flash: p.flash,
+    number: human && p.world.settings.mode === 'campaign'
+      ? p.world.players.filter((q) => q.controller === 'human').findIndex((q) => q.id === player.id) + 1 : undefined,
   });
   const cx = r.x + pad * 2 + gs;
   const cw = r.x + r.w - pad - cx;

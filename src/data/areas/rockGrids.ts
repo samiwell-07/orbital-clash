@@ -1,4 +1,5 @@
 import type { MapDef, PaletteId } from '@/types';
+import { MAX_COOP_PLAYERS } from '@/config/constants';
 
 /** Original rock layouts, one per campaign area: grids/NN.txt is area NN ('X' rock, '.' floor). */
 const FILES = import.meta.glob('./grids/*.txt', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -59,7 +60,7 @@ export function placeBases(rows: readonly string[]): Tile[] {
     const room = clearance(rows, tx, ty);
     if (room >= 1) pads.push({ tx, ty, room });
   }));
-  if (pads.length < 4) throw new Error('rock grid has too few clear 3x3 pads for the bases');
+  if (pads.length < MAX_COOP_PLAYERS + 1) throw new Error('rock grid has too few clear 3x3 pads for the bases');
   const at = (d: Int32Array, t: Tile) => d[t.ty * w + t.tx];
   // Double sweep: the farthest pad from a corner, then the farthest pad from that one (room breaks near-ties).
   const farthest = (from: Tile) => {
@@ -73,10 +74,11 @@ export function placeBases(rows: readonly string[]): Tile[] {
   const partners: Tile[] = [];
   const order = [...pads].sort((p, q) => at(fromHuman, p) - at(fromHuman, q) || q.room - p.room || p.ty - q.ty || p.tx - q.tx);
   for (const p of order) {
-    if (partners.length === 2) break;
+    if (partners.length === MAX_COOP_PLAYERS - 1) break;
+    if (at(fromHuman, p) < 0) continue;
     if ([human, enemy, ...partners].every((t) => cheb(t, p) >= 3)) partners.push(p);
   }
-  if (partners.length < 2) throw new Error('rock grid has no room for the co-op partner pads');
+  if (partners.length < MAX_COOP_PLAYERS - 1) throw new Error('rock grid has no room for the co-op partner pads');
   return [human, enemy, ...partners].map(({ tx, ty }) => ({ tx, ty }));
 }
 

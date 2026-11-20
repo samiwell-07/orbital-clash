@@ -2,7 +2,7 @@ import { COLORS, drawText, wrapText } from '../theme';
 import { Form, buttonRows } from '../menus/form';
 import { drawForm } from '../menus/formDraw';
 import { createBattleScreen } from './battle';
-import { createCampaignScreen } from './campaign';
+import { createCampaignPacks } from './campaignPacks';
 import { drawFooter, drawHeader } from './common';
 import { createJoinOnlineScreen, NEEDS_DEV_SERVER } from './joinOnline';
 import type { Screen, ScreenCtx } from './types';
@@ -35,7 +35,7 @@ export function createMultiplayerScreen(): Screen {
       if (ev.back || ev.activated === 'back') return { t: 'pop' };
       switch (ev.activated) {
         case 'createBattle': return { t: 'push', screen: createBattleScreen({ online: true }) };
-        case 'createCoop': return { t: 'push', screen: createCampaignScreen({ online: true }) };
+        case 'createCoop': return { t: 'push', screen: createCampaignPacks({ online: true }) };
         case 'join': return { t: 'push', screen: createJoinOnlineScreen() };
         default: return null;
       }

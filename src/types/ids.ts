@@ -1,10 +1,11 @@
 // Core identifiers shared by every module. Pure types and const tables, no logic.
 
-export type PlayerId = 0 | 1 | 2 | 3;
+export type PlayerId = 0 | 1 | 2 | 3 | 4;
 export type TeamId = number;
 export type EntityId = number;
 
-export const PLAYER_IDS: readonly PlayerId[] = [0, 1, 2, 3];
+/** Campaign needs four humans plus a scripted enemy; battles use slots 0-3. */
+export const PLAYER_IDS: readonly PlayerId[] = [0, 1, 2, 3, 4];
 
 /** Four Basic Ops units (manual: Scouts, Tanks, Drones, Torpedoes). */
 export type BasicUnitKind = 'scout' | 'tank' | 'drone' | 'torpedo';

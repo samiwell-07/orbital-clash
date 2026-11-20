@@ -3,6 +3,8 @@ import type { Rect } from '../layout';
 import { drawDigits, digitsWidth } from './digits';
 
 export interface GlyphOpts {
+  /** Lobby seat number when it differs from the internal simulation slot. */
+  number?: number;
   /** AI/enemy: draws a hexagonal flower sigil instead of the player number. */
   enemy?: boolean;
   /** PLAYER_COLORS index of the team frame (defaults to the player's own colour). */
@@ -49,7 +51,7 @@ export function drawPlayerGlyph(ctx: Ctx, r: Rect, player: number, o: GlyphOpts 
   if (o.enemy) sigil(ctx, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.4, o.alive === false ? '#5a2a2e' : col);
   else {
     const h = r.h * 0.6;
-    const txt = String(player + 1);
+    const txt = String(o.number ?? player + 1);
     drawDigits(ctx, txt, r.x + r.w / 2 - digitsWidth(txt, h) / 2, r.y + (r.h - h) / 2, h, {
       color: o.alive === false ? '#555b6b' : col, ghost: 0.12, glow: rgba(col, 0.8),
     });

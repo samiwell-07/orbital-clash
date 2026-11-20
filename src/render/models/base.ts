@@ -2,6 +2,7 @@ import { CylinderGeometry, Group, SphereGeometry, TorusGeometry } from 'three';
 import type { Mesh } from 'three';
 import { STORAGE_CAP } from '@/config/constants';
 import type { Player, UnitKind, World } from '@/types';
+import { PLAYER_IDS } from '@/types';
 import { assemble, box, cached, coneX, cyl, sph } from '@/render/instancing/kit';
 import type { PartSpec } from '@/render/instancing/kit';
 import { TEAM_GLOW, teamIndex } from '@/render/instancing/colorTables';
@@ -18,7 +19,7 @@ const RINGS = 3;
 const W = 0xffffff;
 const D = 0x4a4e58;
 
-const ownerSlot = (owner: number): number => (owner >= 0 && owner < 4 ? owner | 0 : 0);
+const ownerSlot = (owner: number): number => (owner >= 0 && owner < PLAYER_IDS.length ? owner | 0 : 0);
 
 interface BaseView {
   b: ViewBuilder;
@@ -53,7 +54,7 @@ function fortressGeometry() {
 export class BaseSystem implements ModelSystem {
   readonly group = new Group();
   private readonly views: (BaseView | undefined)[] = [];
-  private readonly flash: number[] = [-99, -99, -99, -99];
+  private readonly flash: number[] = PLAYER_IDS.map(() => -99);
   private readonly anim = newAnim();
 
   load(_world: World): void {

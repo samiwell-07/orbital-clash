@@ -29,7 +29,7 @@ export function hex(n: number): string {
 
 /** CSS colour of an owner (player id), following the lobby colour choice. */
 export function playerColor(p: number): string {
-  return hex(ownerColor(((p % 4) + 4) % 4));
+  return hex(ownerColor(p));
 }
 
 /** CSS colour of a palette index (lobby swatches, team labels); not remapped by owner. */

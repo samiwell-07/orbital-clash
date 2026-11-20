@@ -1,4 +1,5 @@
 import { ownerColor } from '@/config/playerColors';
+import { PLAYER_IDS } from '@/types';
 
 export const FIRE_HOT = 0xfff2a0;
 export const FIRE_MID = 0xff7a1a;
@@ -19,7 +20,7 @@ export const BOMB_ORANGE = 0xff8a2a;
 export const CRYSTAL = 0x7fe9ff;
 
 export function playerColor(owner: number): number {
-  return owner >= 0 && owner < 4 ? ownerColor(owner) : 0xffffff;
+  return owner >= 0 && owner < PLAYER_IDS.length ? ownerColor(owner) : 0xffffff;
 }
 
 /** Linear mix of two 0xRRGGBB colours in sRGB space (t = 0 gives a). */

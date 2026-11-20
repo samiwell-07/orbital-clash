@@ -337,7 +337,7 @@ Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**,
 
 Ramp rules [tuned]: `startThorium` baseline 300 + 10-20 per area; AI aggression 1->9; enemy hits 5->60; hints available in areas 1-28 (Beginner/Casual always, Normal 1-6 only, Expert none). Each regular area and Resurgence has its own square plateau. Areas 1-40 use the original 30x30 rock layouts in `src/data/areas/grids/NN.txt` (file NN = area NN, `X` = rock, `.` = floor); the human and enemy bases go on the two clear 3x3 pads farthest apart on foot (human nearer the top-left) and co-op pads on the clear spots nearest the human. Areas 41-42 and the Resurgences keep generated plateaus. Enemy scripts: timeline `release` events plus reactive AI.
 
-Highlight any Campaign area, including a locked area or Resurgence, to see its square terrain preview. The briefing keeps that preview visible while you choose difficulty.
+Choose Original or Expansion, 1-4 players and difficulty on the Campaign entry screen, then Continue to the area map. These choices apply throughout the run. Highlight any Campaign area, including a locked area or Resurgence, to see its square terrain preview. The briefing keeps that preview visible before launching the mission.
 
 For playtesting, open the game with `?unlockMaps=1` to launch any Original or Expansion mission from the picker without marking it complete. Remove the query parameter to restore normal access.
 

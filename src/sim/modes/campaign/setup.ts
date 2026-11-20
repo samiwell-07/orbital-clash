@@ -5,13 +5,13 @@ import { seedFor } from '@/data/areas/seeds';
 import { placeStructure } from './actions';
 import { campaignState, scriptIds } from './state';
 
-export const HUMAN_SLOT_IDS: readonly PlayerId[] = [0, 2, 3];
+export const HUMAN_SLOT_IDS: readonly PlayerId[] = [0, 2, 3, 4];
 export const ENEMY_ID: PlayerId = 1;
 
 export interface CampaignParams {
   mission: Mission;
   difficulty: Difficulty;
-  /** 1-3 humans (co-op): one team, each with their own base on map.baseTiles[id] (createWorld places them). */
+  /** 1-4 humans (co-op): one team, each with their own base on map.baseTiles[id] (createWorld places them). */
   humanPlayers?: number;
   /** Lobby colour (PLAYER_COLORS index) per human, in HUMAN_SLOT_IDS order. */
   humanColors?: readonly number[];

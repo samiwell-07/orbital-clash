@@ -8,7 +8,7 @@ import {
 } from '@/sim/modes/campaign';
 import { executeAction } from '@/sim/modes/campaign/actions';
 import { addStored, launchBatch } from '@/sim/army';
-import { ALL_MISSIONS } from '@/data/areas';
+import { ALL_MISSIONS, EXPANSION_MISSIONS } from '@/data/areas';
 import { PlayerController } from '@/input/playerIntents';
 import { PAD } from '@/input/bindings';
 import { emptySnapshot } from '@/input/gamepad';
@@ -49,23 +49,23 @@ describe('campaign co-op bases', () => {
     expect(w.players[3].baseBuilt).toBe(false);
   });
 
-  it('lets player 2 build a Turret, produce Scouts at its own base and launch them', () => {
-    const { sim, w } = coop(2);
-    const t = freeTileNear(w, 2);
-    expect(canBuild(w, 2, 'turret', t.tx, t.ty)).toEqual({ ok: true, reason: '' });
-    sim.step([{ t: 'build', player: 2, kind: 'turret', tx: t.tx, ty: t.ty }]);
-    expect([...w.structures.values()].some((s) => s.owner === 2 && s.kind === 'turret')).toBe(true);
+  it.each([2, 4] as const)('lets slot %s build a Turret, produce Scouts at its own base and launch them', (id) => {
+    const { sim, w } = coop(4);
+    const t = freeTileNear(w, id);
+    expect(canBuild(w, id, 'turret', t.tx, t.ty)).toEqual({ ok: true, reason: '' });
+    sim.step([{ t: 'build', player: id, kind: 'turret', tx: t.tx, ty: t.ty }]);
+    expect([...w.structures.values()].some((s) => s.owner === id && s.kind === 'turret')).toBe(true);
 
-    const o = freeTileNear(w, 2);
-    sim.step([{ t: 'build', player: 2, kind: 'basicOps', tx: o.tx, ty: o.ty }]);
-    expect([...w.structures.values()].some((s) => s.owner === 2 && s.kind === 'basicOps')).toBe(true);
-    for (let i = 0; i < 30 * TICK_HZ && (w.players[2].stored.scout ?? 0) < 2; i++) sim.step([]);
-    expect(w.players[2].stored.scout ?? 0).toBeGreaterThan(0);
+    const o = freeTileNear(w, id);
+    sim.step([{ t: 'build', player: id, kind: 'basicOps', tx: o.tx, ty: o.ty }]);
+    expect([...w.structures.values()].some((s) => s.owner === id && s.kind === 'basicOps')).toBe(true);
+    for (let i = 0; i < 30 * TICK_HZ && (w.players[id].stored.scout ?? 0) < 2; i++) sim.step([]);
+    expect(w.players[id].stored.scout ?? 0).toBeGreaterThan(0);
 
     const before = w.units.length;
-    sim.step([{ t: 'attackSelect', player: 2, kind: 'scout' }]);
+    sim.step([{ t: 'attackSelect', player: id, kind: 'scout' }]);
     for (let i = 0; i < TICK_HZ; i++) sim.step([]);
-    const mine = w.units.slice(before).filter((u) => u.owner === 2);
+    const mine = w.units.slice(before).filter((u) => u.owner === id);
     expect(mine.length).toBeGreaterThan(0);
     expect(mine.every((u) => u.targetPlayer === 1)).toBe(true);
   });
@@ -90,9 +90,9 @@ describe('campaign co-op bases', () => {
   });
 
   it('loses the mission when a partner base is destroyed', () => {
-    const { sim, w } = coop(3);
+    const { sim, w } = coop(4);
     const emit = (e: SimEvent) => w.events.push(e);
-    hitBase(w, 2, 1, emit, w.players[2].maxHits);
+    hitBase(w, 4, 1, emit, w.players[4].maxHits);
     sim.step([]);
     sim.step([]);
     expect(w.over).toBe(true);
@@ -102,7 +102,7 @@ describe('campaign co-op bases', () => {
   });
 
   it('spreads scripted releases across the living human bases', () => {
-    const w = createWorld(startCampaign({ mission: kreios2, difficulty: 'normal', humanPlayers: 3 }));
+    const w = createWorld(startCampaign({ mission: kreios2, difficulty: 'normal', humanPlayers: 4 }));
     applyMissionSetup(w, () => undefined);
     const aimed: PlayerId[] = [];
     setReleaseHandler((world, owner) => { aimed.push(world.players[owner].attack.targetPlayer); });
@@ -120,7 +120,7 @@ describe('campaign co-op bases', () => {
         launchBatch(world, owner, kind, count, emit);
       });
     }
-    expect(aimed.slice(0, 4)).toEqual([0, 2, 3, 0]);
+    expect(aimed.slice(0, 4)).toEqual([0, 2, 3, 4]);
     expect(aimed[4]).not.toBe(2);
   });
 
@@ -130,8 +130,8 @@ describe('campaign co-op bases', () => {
     expect(w.players[2].baseBuilt || w.players[3].baseBuilt).toBe(false);
   });
 
-  it.each(ALL_MISSIONS.map((m) => [m.id, m] as const))('%s sets up for 3 humans with every base reachable', (_id, m) => {
-    const w = createWorld(startCampaign({ mission: m, difficulty: 'normal', humanPlayers: 3 }));
+  it.each([...ALL_MISSIONS, ...EXPANSION_MISSIONS].map((m) => [m.id, m] as const))('%s sets up for 4 humans with every base reachable', (_id, m) => {
+    const w = createWorld(startCampaign({ mission: m, difficulty: 'normal', humanPlayers: 4 }));
     expect(applyMissionSetup(w, () => undefined)).toEqual([]);
     const enemy = { tx: w.players[1].baseTx, ty: w.players[1].baseTy };
     const tiles = new Set<string>();
@@ -142,6 +142,6 @@ describe('campaign co-op bases', () => {
       expect(pathExists(w, { tx: p.baseTx, ty: p.baseTy }, enemy)).toBe(true);
       tiles.add(`${p.baseTx},${p.baseTy}`);
     }
-    expect(tiles.size).toBe(3);
+    expect(tiles.size).toBe(4);
   });
 });

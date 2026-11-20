@@ -88,6 +88,16 @@ describe('HUD layout', () => {
     expect(autoMode(1024, 768)).toBe('4:3');
     expect(autoMode(1920, 1080)).toBe('16:9');
   });
+  it.each(['16:9', '4:3'] as const)('fits four humans plus the campaign enemy in %s without overlapping panels', (mode) => {
+    const l = computeHudLayout(mode === '16:9' ? 1920 : 1440, 1080, mode, 5);
+    expect(l.panels).toHaveLength(5);
+    for (const [i, panel] of l.panels.entries()) {
+      expect(inside(panel, l.safe)).toBe(true);
+      expect(overlap(panel, l.timer)).toBe(false);
+      expect(overlap(panel, l.play)).toBe(false);
+      for (const other of l.panels.slice(i + 1)) expect(overlap(panel, other)).toBe(false);
+    }
+  });
 
   it('fits a map into the play rect and clamps popups', () => {
     const proj = fitProjection({ x: 100, y: 0, w: 960, h: 600 }, 48, 30);

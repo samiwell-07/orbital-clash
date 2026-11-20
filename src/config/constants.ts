@@ -11,7 +11,7 @@ export const MAP_W = MAP_H;
 /** Manual: a base can hold up to 1000 units. */
 export const STORAGE_CAP = 1000;
 export const MAX_PLAYERS = 4;
-export const MAX_COOP_PLAYERS = 3;
+export const MAX_COOP_PLAYERS = 4;
 
 /** Manual: 1 to 100 hits before a base falls. */
 export const MIN_HITS = 1;

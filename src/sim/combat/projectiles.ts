@@ -1,4 +1,4 @@
-import type { Emit, Projectile, System, Unit, World } from '@/types';
+import type { Emit, PlayerId, Projectile, System, Unit, World } from '@/types';
 import { hitBase } from '@/sim/core';
 import { UNIT_DEFS } from '@/data';
 import { damageUnit, splashStructures, splashUnits } from './damage';
@@ -75,7 +75,7 @@ function structureInFuse(w: World, p: Projectile): boolean {
   return false;
 }
 
-function baseInFuse(w: World, p: Projectile): number {
+function baseInFuse(w: World, p: Projectile): PlayerId | -1 {
   for (const pl of w.players) {
     if (!pl.alive || !pl.baseBuilt || !hostile(w, p.owner, pl.id)) continue;
     if (Math.hypot(pl.baseTx + 0.5 - p.x, pl.baseTy + 0.5 - p.y) <= IMPACT_FUSE) return pl.id;
@@ -87,7 +87,7 @@ function baseInFuse(w: World, p: Projectile): number {
 function stepImpact(w: World, p: Projectile, emit: Emit): boolean {
   const base = baseInFuse(w, p);
   if (base === -1 && p.life > 0 && !structureInFuse(w, p)) return true;
-  if (base !== -1) hitBase(w, base as 0 | 1 | 2 | 3, p.owner, emit, p.kind === 'missile' ? MISSILE_BASE_HITS : TORPEDO_BASE_HITS);
+  if (base !== -1) hitBase(w, base, p.owner, emit, p.kind === 'missile' ? MISSILE_BASE_HITS : TORPEDO_BASE_HITS);
   const radius = p.splash > 0 ? p.splash : 1;
   splashStructures(w, p.x, p.y, radius, p.damage, p.owner, emit);
   splashUnits(w, p.x, p.y, radius, p.damage, p.owner, 'both', emit);

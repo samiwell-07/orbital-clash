@@ -11,7 +11,7 @@ describe('owner colours follow the lobby colour map', () => {
   afterEach(() => resetPlayerColorMap());
 
   it('defaults to the identity map', () => {
-    for (let id = 0; id < 4; id++) {
+    for (let id = 0; id < 5; id++) {
       expect(teamIndex(id)).toBe(id);
       expect(fxPlayerColor(id)).toBe(PLAYER_COLORS[id]);
       expect(playerColor(id)).toBe(css(PLAYER_COLORS[id]));
@@ -21,12 +21,14 @@ describe('owner colours follow the lobby colour map', () => {
   });
 
   it('maps owners to their chosen palette colour', () => {
-    setPlayerColorMap([6, 0, 4, 7]);
-    expect([0, 1, 2, 3].map(teamIndex)).toEqual([6, 0, 4, 7]);
+    setPlayerColorMap([6, 0, 4, 7, 2]);
+    expect([0, 1, 2, 3, 4].map(teamIndex)).toEqual([6, 0, 4, 7, 2]);
     expect(fxPlayerColor(0)).toBe(PLAYER_COLORS[6]);
     expect(fxPlayerColor(3)).toBe(PLAYER_COLORS[7]);
     expect(playerColor(2)).toBe(css(PLAYER_COLORS[4]));
     expect(playerColor(1)).toBe(css(PLAYER_COLORS[0]));
+    expect(playerColor(4)).toBe(css(PLAYER_COLORS[2]));
+    expect(fxPlayerColor(4)).toBe(PLAYER_COLORS[2]);
   });
 
   it('keeps palette lookups (team labels, swatches) independent of the owner map', () => {

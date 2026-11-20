@@ -5,7 +5,7 @@ import { BeamTracker } from './emitters/beams';
 import { emitExplosion, emitMegaExplosion, emitStructureCollapse } from './emitters/explosion';
 import { emitBomberShot, emitBuildSparkle, emitHitSparks, emitLaserMuzzle, emitPulsarShot, emitRecycleDissolve, emitTurretShot } from './emitters/sparks';
 import { emitLaunchWhoosh, emitRepairPulse, emitTeleportColumn, emitThoriumPulse } from './emitters/rings';
-import { emitRockBurst, emitThoriumGlow } from './emitters/thorium';
+import { emitRockBurst, emitThoriumGlow, emitTokenFlight } from './emitters/thorium';
 import { emitShieldRipple } from './emitters/shield';
 import { CYAN, playerColor } from './palette';
 
@@ -37,6 +37,7 @@ export function dispatch(c: FxCmd, ctx: DispatchCtx): void {
     case 'recycle': emitRecycleDissolve(fx, c.x, c.y); break;
     case 'repair': emitRepairPulse(fx, c.x, c.y); break;
     case 'rockSpawn': emitThoriumGlow(fx, c.x, c.y); break;
+    case 'token': emitTokenFlight(fx, c.x, c.y, c.tx, c.ty, c.sub === 'health'); break;
   }
 }
 

@@ -1,5 +1,6 @@
 import type { BufferGeometry } from 'three';
 import type { UnitKind } from '@/types';
+import { UNIT_DEFS } from '@/data';
 import { assemble, box, coneX, cyl, cylX, ico, octa, slab, sph, W, D } from './kit';
 import type { KindSpecs, PartSpec } from './kit';
 import { specialSpecs } from './unitGeometriesSpecial';
@@ -8,11 +9,35 @@ export interface UnitModel { body: BufferGeometry; glow: BufferGeometry }
 
 const PI = Math.PI;
 
-/** Visual scale = UnitDef.radius * VIS[kind]; geometry spans roughly x in [-1,1]. */
+/** Air visual scale = UnitDef.radius * VIS[kind]; geometry spans roughly x in [-1,1]. */
 export const VIS: Readonly<Record<UnitKind, number>> = {
   scout: 0.7, tank: 0.78, drone: 0.85, torpedo: 0.9, hammer: 0.9,
   switch: 0.85, thief: 0.8, carrier: 1.2, snake: 1.0, dragon: 0.95,
 };
+
+/** Max horizontal extent (tiles) every ground-layer kind is drawn at. */
+export const GROUND_FOOTPRINT = 0.8;
+const scaleCache = new Map<UnitKind, number>();
+
+/** Max horizontal (x/z) extent of the kind's model in model units. */
+export function modelFootprint(kind: UnitKind): number {
+  const m = getUnitModel(kind, 0);
+  m.body.computeBoundingBox();
+  m.glow.computeBoundingBox();
+  const b = m.body.boundingBox!.clone().union(m.glow.boundingBox!);
+  return Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
+}
+
+/** Uniform instance scale: ground kinds are fitted to GROUND_FOOTPRINT, air kinds keep radius * VIS. */
+export function visualScale(kind: UnitKind): number {
+  let s = scaleCache.get(kind);
+  if (s === undefined) {
+    const def = UNIT_DEFS[kind];
+    s = def.layer === 'ground' ? GROUND_FOOTPRINT / modelFootprint(kind) : def.radius * VIS[kind];
+    scaleCache.set(kind, s);
+  }
+  return s;
+}
 
 /** Team silhouette detail: blue smooth shards, red spikes, purple horns, orange fins (palette 4-7 reuse them in order). */
 export function crest(colorIndex: number, y: number, k: number): PartSpec[] {

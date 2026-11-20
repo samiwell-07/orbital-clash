@@ -64,6 +64,8 @@ export interface Projectile {
   damage: number;
   splash: number;
   targetId: EntityId | 0;
+  /** Player whose ship this shot homes on (ships have no entity id), else -1. */
+  targetShip: PlayerId | -1;
   life: number;
   layerMask: 'ground' | 'air' | 'both';
 }
@@ -94,4 +96,13 @@ export interface Ship {
   cursorTx: number;
   cursorTy: number;
   carrying: EntityId | 0;
+  hp: number;
+  /** Grows with health tokens (cap SHIP_HP_CAP), shrinks on each death (floor SHIP_HP_START). */
+  maxHp: number;
+  /** Destroyed and waiting to respawn: hidden, untargetable, ignores input. */
+  dead: boolean;
+  /** Seconds left until a dead ship respawns at its base. */
+  respawnTimer: number;
+  /** Hovering over its own base and repairing this tick. */
+  healing: boolean;
 }

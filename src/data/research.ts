@@ -21,6 +21,7 @@ export const RESEARCH_DEFS: readonly ResearchDef[] = [
   { key: 'missileDefense', name: 'Missile Defense', description: 'Flak turret that shoots down enemy missiles.', cost: 150, bionic: true },
   { key: 'dragonSwarm', name: 'Dragon Swarm', description: 'Heavy flying swarm creatures.', cost: 180, bionic: true },
   { key: 'missileSilo', name: 'Missile Silo', description: 'Long-range missiles that strike enemy bases.', cost: 200, bionic: true },
+  { key: 'kamikaze', name: 'Kamikaze Drones', description: 'Tougher drones that dive into enemy ships and explode.', cost: 160, bionic: true },
 ];
 
 export const TECH_UNITS: Readonly<Record<string, UnitKind>> = {
@@ -37,6 +38,11 @@ export const TECH_WEAPONS: Readonly<Record<string, WeaponKind>> = {
 export const TECH_STRUCTURES: Readonly<Record<string, StructureKind>> = {
   gateways: 'gateway', hammers: 'specialOps', waypoint: 'waypoint',
   missileSilo: 'missileSilo', missileDefense: 'missileDefense',
+};
+
+/** Techs that upgrade an existing unit instead of unlocking something new (Kamikaze Drones: see units/tuning KAMIKAZE). */
+export const TECH_UPGRADES: Readonly<Record<string, UnitKind>> = {
+  kamikaze: 'drone',
 };
 
 /** Base-game tech keys (the campaign set). Bionic research is excluded; see BIONIC_TECH_KEYS. */

@@ -49,6 +49,18 @@ export class PlayerUiMachine {
     this.state.buildIndex = (((this.state.buildIndex + step) % count) + count) % count;
   }
 
+  /** Jumps by `step` items, stopping at the first/last item; wraps only when already at that edge. */
+  jumpBuild(step: number, count: number): void {
+    if (count <= 0) {
+      this.state.buildIndex = 0;
+      return;
+    }
+    const last = count - 1;
+    const i = this.state.buildIndex;
+    if (step > 0) this.state.buildIndex = i >= last ? 0 : Math.min(last, i + step);
+    else this.state.buildIndex = i <= 0 ? last : Math.max(0, i + step);
+  }
+
   clampBuild(count: number): void {
     this.state.buildIndex = Math.max(0, Math.min(Math.max(0, count - 1), this.state.buildIndex));
   }

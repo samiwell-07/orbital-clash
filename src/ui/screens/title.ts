@@ -10,6 +10,7 @@ import { drawLogo } from './logo';
 import { createMultiplayerScreen } from './multiplayer';
 import { createSettingsScreen } from './settings';
 import { createTrophiesScreen } from './trophies';
+import { drawTitleScene, titleShip } from './titleScene';
 import type { Screen } from './types';
 
 const ITEMS = [
@@ -24,10 +25,12 @@ const ITEMS = [
 
 export function createTitleScreen(): Screen {
   const form = new Form(buttonRows(ITEMS));
+  let ship: CanvasImageSource | null | undefined;
   return {
     id: 'title',
     update(nav, dt) {
       const ev = form.handle(nav, dt);
+      if (ev.activated) ship = undefined;
       switch (ev.activated) {
         case 'campaign': return { t: 'push', screen: createCampaignPacks() };
         case 'battle': return { t: 'push', screen: createBattleScreen() };
@@ -40,10 +43,12 @@ export function createTitleScreen(): Screen {
       }
     },
     draw(g, size, now, ctx) {
+      if (ship === undefined) ship = titleShip(ctx.shipPreview);
+      drawTitleScene(g, size.w, size.h, now, ship);
       drawLogo(g, size.w / 2, size.h * 0.24, size.w / 1920 * 1.05, now);
       const bw = 400;
       drawForm(g, form, { x: (size.w - bw) / 2, y: size.h * 0.5, w: bw, h: size.h * 0.46 }, now, { rowH: 46, gap: 8 });
-      drawText(g, 'v1.0  ·  an original homage to the PS3 classic', size.w / 2, size.h - 92, { size: 14, color: COLORS.dim, align: 'center' });
+      drawText(g, 'v1.0', size.w / 2, size.h - 92, { size: 14, color: COLORS.dim, align: 'center' });
       drawFooter(g, size.h, ctx.data.save.settings.controlsDisplay, [{ key: 'move', label: 'Select' }, { key: 'confirm', label: 'Confirm' }]);
     },
   };

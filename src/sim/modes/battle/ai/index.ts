@@ -24,7 +24,7 @@ export class AdaptiveAI {
     if (!p.alive || w.over) return [];
     const mem = this.mem;
     const tun = (mem.tuning ??= AI_TUNING[w.settings.difficulty]);
-    const move = shipIntents(w, me, mem, dt);
+    const move = p.ship.dead ? [] : shipIntents(w, me, mem, dt);
     mem.timer -= dt;
     if (mem.timer > 0) return move;
     mem.timer = tun.thinkSec;

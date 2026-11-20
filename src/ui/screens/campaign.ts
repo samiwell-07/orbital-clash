@@ -47,7 +47,7 @@ export function createCampaignScreen(opts: CampaignOptions = {}): Screen {
       drawHeader(g, size.w, opts.expansion ? 'Campaign · Expansion' : opts.online ? 'Online Co-op' : 'Campaign', opts.expansion ? 'Gaia and Kronos · Areas 29–42 and two Resurgence missions' : opts.online ? 'Pick an area, then open the lobby: friends join with its room code' : 'Take control of four comets');
       const rowH = 150, top = 190, x0 = 295, previewSide = 320;
       order.forEach((id, row) => {
-        const cy = top + (row + 0.5) * (opts.expansion ? 240 : rowH);
+        const cy = top + (row + 0.5) * rowH;
         const open = ctx.data.unlockMaps || isCometUnlocked(save, id);
         const colors = COMET_COLORS[id];
         drawComet(g, id, 150, cy - 8, 44, !open, now);
@@ -66,19 +66,6 @@ export function createCampaignScreen(opts: CampaignOptions = {}): Screen {
           const selected = cursor.row === row && cursor.col === col;
           const locked = !ctx.data.unlockMaps && !isAreaUnlocked(save, id, n.index, n.resurgence);
           const rec = getArea(save, id, n.index, n.resurgence);
-          const rows = opts.expansion ? findArea(areas, n)?.rows : undefined;
-          if (rows?.length) {
-            const side = Math.min(115, step - 10);
-            drawMapPreview(g, x - side / 2, cy - side / 2, side, rows, id);
-            if (selected) {
-              g.strokeStyle = COLORS.cyan;
-              g.lineWidth = 5;
-              g.strokeRect(x - side / 2 - 3, cy - side / 2 - 3, side + 6, side + 6);
-            }
-            drawText(g, n.resurgence ? 'R' : String(areaNumber(n)), x, cy + side / 2 + 25,
-              { size: 22, color: selected ? COLORS.cyan : '#fff', align: 'center', weight: 700 });
-            continue;
-          }
           drawNode(g, {
             x, y: cy, label: n.resurgence ? 'R' : String(areaNumber(n)),
             locked, rank: rec?.bestRank ?? null, selected, resurgence: n.resurgence, accent: colors.glow,

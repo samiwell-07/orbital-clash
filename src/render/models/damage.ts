@@ -25,15 +25,3 @@ export function flicker(ratio: number, id: number, t: number): number {
   const noise = Math.max(0, Math.sin(t * 23 + id) * Math.sin(t * 7.3 + id * 2));
   return 1 - (1 - ratio * 2) * 0.6 * noise;
 }
-
-/** Brightness of shield ring i (0 = inner) of n: outer rings drop first as hits approach maxHits. */
-export function shieldRing(i: number, n: number, hits: number, maxHits: number): number {
-  const remaining = maxHits > 0 ? clamp01(1 - hits / maxHits) : 0;
-  return 0.12 + 0.88 * clamp01(remaining * n - i);
-}
-
-/** Core glow 0..1 for the unit-storage dome (log scale so 10 units already show). */
-export function storageGlow(count: number, cap: number): number {
-  if (count <= 0) return 0.1;
-  return 0.18 + 0.82 * clamp01(Math.log(1 + count) / Math.log(1 + cap));
-}

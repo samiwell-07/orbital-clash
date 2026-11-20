@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Difficulty, Mission, ScriptAction, SimEvent } from '@/types';
-import { STAGE_ORDER, createSim, registerSystem } from '@/sim/core';
+import { STAGE_ORDER, addStructure, createSim, createWorld, registerSystem, removeStructure, structureAt } from '@/sim/core';
 import { productionSystem } from '@/sim/army/production';
 import {
-  compile, isMissionErrored, missionErrors, setReleaseHandler, startCampaign, timelineSystem,
+  applyMissionSetup, compile, isMissionErrored, missionErrors, setReleaseHandler, startCampaign, timelineSystem,
 } from '@/sim/modes/campaign';
-import { ALL_MISSIONS, getMission } from '@/data/areas';
+import { executeAction } from '@/sim/modes/campaign/actions';
+import { ALL_MISSIONS, EXPANSION_MISSIONS, getMission } from '@/data/areas';
 import { registerSeed } from '@/data/areas/seeds';
 import { canBuild } from '@/sim/build';
 
@@ -20,7 +21,7 @@ beforeEach(() => {
 });
 afterEach(() => setReleaseHandler(null));
 
-const find = (id: string): Mission => ALL_MISSIONS.find((m) => m.id === id) as Mission;
+const find = (id: string): Mission => [...ALL_MISSIONS, ...EXPANSION_MISSIONS].find((m) => m.id === id) as Mission;
 
 function make(mission: Mission, difficulty: Difficulty = 'normal', seed = 7, humans = 1) {
   return createSim(startCampaign({ mission, difficulty, seed, humanPlayers: humans }));
@@ -110,6 +111,7 @@ describe('timeline runner', () => {
     const cases: [string, Difficulty][] = [
       ['kreios-1', 'expert'], ['kreios-7', 'expert'], ['hathor-4', 'expert'], ['hathor-r', 'expert'], ['aether-6', 'expert'],
       ['aether-r', 'expert'], ['helios-7', 'expert'], ['helios-r', 'expert'], ['kreios-1', 'beginner'], ['helios-7', 'beginner'],
+      ['gaia-r', 'expert'], ['kronos-7', 'expert'],
     ];
     for (const [id, d] of cases) {
       const m = find(id);
@@ -161,7 +163,8 @@ describe('timeline runner', () => {
     const sim = make(m);
     run(sim, 2);
     expect(launches[0]).toMatch(/:1:scout:10$/);
-    expect(launches).toHaveLength(2);
+    // 'all' also launches whatever the preplaced towers produced meanwhile.
+    expect(launches.filter((l) => l.includes(':scout:'))).toHaveLength(2);
     expect(sim.world.players[1].stored.scout ?? 0).toBeLessThanOrEqual(2);
   });
 
@@ -234,5 +237,101 @@ describe('taught tech', () => {
     expect(ev).toContainEqual({ t: 'techUnlocked', owner: 1, key: 'pulsar' });
     expect(ev.filter((e) => e.t === 'techUnlocked' && e.owner === 0)).toEqual([]);
     expect(sim.world.players[0].tech.pulsar).toBeFalsy();
+  });
+});
+
+describe('enemy bursts', () => {
+  const enemyKinds = new Set(['build', 'upgrade', 'upgradeAll', 'rebuildAll', 'setOutputAll', 'release', 'grantThorium']);
+  const burstKinds = new Set(['upgradeAll', 'rebuildAll']);
+
+  function setup(id = 'kreios-2') {
+    const w = createWorld(startCampaign({ mission: find(id), difficulty: 'normal' }));
+    expect(applyMissionSetup(w, () => undefined)).toEqual([]);
+    const events: SimEvent[] = [];
+    const exec = (a: ScriptAction) => executeAction(w, 1, a, { dry: false }, (e) => events.push(e));
+    const mine = (kind?: string) => [...w.structures.values()].filter((s) => s.owner === 1 && (!kind || s.kind === kind));
+    return { w, events, exec, mine };
+  }
+
+  it.each(['kreios-1', 'hathor-6', 'helios-r', 'gaia-1', 'kronos-r'])('%s starts fully geared and stays quiet for 30 s', (id) => {
+    const m = find(id);
+    const sim = make(m);
+    const first = run(sim, 1 / 60);
+    const enemyPre = m.preplaced.filter((p) => p.owner === 1);
+    expect(first.filter((e) => e.t === 'structureBuilt' && e.owner === 1)).toHaveLength(enemyPre.length);
+    expect([...sim.world.structures.values()].filter((s) => s.owner === 1)).toHaveLength(enemyPre.length);
+    const quiet = run(sim, 29.9);
+    expect(quiet.filter((e) => e.t === 'structureBuilt' || e.t === 'structureUpgraded' || (e.t === 'thorium' && e.owner === 1))).toEqual([]);
+    expect(launches).toEqual([]);
+    expect(m.timeline.filter((e) => enemyKinds.has(e.action.a) && e.atSec < 30)).toEqual([]);
+  });
+
+  it('every area acts in bursts from 40 s on, 60-90 s apart', () => {
+    for (const m of [...ALL_MISSIONS, ...EXPANSION_MISSIONS]) {
+      const times = [...new Set(m.timeline.filter((e) => burstKinds.has(e.action.a)).map((e) => e.atSec))];
+      expect(times.length, m.id).toBeGreaterThanOrEqual(2);
+      expect(times[0], m.id).toBeGreaterThanOrEqual(40);
+      expect(times[0], m.id).toBeLessThanOrEqual(60);
+      for (let i = 1; i < times.length; i++) {
+        expect(times[i] - times[i - 1], m.id).toBeGreaterThanOrEqual(60);
+        expect(times[i] - times[i - 1], m.id).toBeLessThanOrEqual(90);
+      }
+    }
+  });
+
+  it('upgradeAll upgrades every laser at once, self-funded, and is a no-op when none qualify', () => {
+    const { w, events, exec, mine } = setup();
+    const lasers = mine('laser');
+    const turrets = mine('turret').map((s) => s.level);
+    expect(lasers.length).toBeGreaterThanOrEqual(2);
+    expect(exec({ a: 'upgradeAll', kind: 'laser', text: 'up!' })).toBeNull();
+    expect(lasers.map((s) => s.level)).toEqual(lasers.map(() => 1));
+    expect(mine('turret').map((s) => s.level)).toEqual(turrets);
+    expect(events.filter((e) => e.t === 'structureUpgraded')).toHaveLength(lasers.length);
+    expect(events.find((e) => e.t === 'thorium')).toEqual({ t: 'thorium', owner: 1, amount: 80 * lasers.length });
+    expect(events.filter((e) => e.t === 'message')).toHaveLength(1);
+    expect(w.players[1].thorium).toBe(0);
+    expect(lasers[0].maxHp).toBeGreaterThan(100);
+
+    expect(exec({ a: 'upgradeAll', kind: 'laser', max: 1 })).toBeNull();
+    expect(lasers.map((s) => s.level)).toEqual([2, ...lasers.slice(1).map(() => 1)]);
+    expect(exec({ a: 'upgradeAll', kind: 'laser', max: 1 })).toBeNull();
+    expect(lasers[1].level).toBe(2);
+
+    events.length = 0;
+    for (const s of lasers) s.level = 3;
+    expect(exec({ a: 'upgradeAll', kind: 'laser', text: 'up!' })).toBeNull();
+    expect(exec({ a: 'upgradeAll', kind: 'bomber' })).toBeNull();
+    expect(exec({ a: 'upgradeAll', kind: 'turret', cap: 0 })).toBeNull();
+    expect(events).toEqual([]);
+    expect(exec({ a: 'upgradeAll', kind: 'warp' as never })).toContain('unknown');
+  });
+
+  it('rebuildAll restores destroyed originals at their level and skips occupied tiles', () => {
+    const { w, events, exec, mine } = setup();
+    const [a, b] = mine('laser');
+    const towers = mine('basicOps').filter((s) => s.level > 0);
+    const tower = towers[0];
+    removeStructure(w, a.id);
+    removeStructure(w, b.id);
+    removeStructure(w, tower.id);
+    addStructure(w, { kind: 'turret', owner: 0, tx: b.tx, ty: b.ty, hp: 120 });
+    expect(exec({ a: 'rebuildAll', text: 'rebuilt' })).toBeNull();
+    expect(structureAt(w, a.tx, a.ty)).toMatchObject({ kind: 'laser', owner: 1, level: 0 });
+    expect(structureAt(w, b.tx, b.ty)).toMatchObject({ kind: 'turret', owner: 0 });
+    expect(structureAt(w, tower.tx, tower.ty)).toMatchObject({ kind: 'basicOps', owner: 1, level: tower.level, output: tower.output });
+    expect(events.filter((e) => e.t === 'structureBuilt')).toHaveLength(2);
+    expect(events.filter((e) => e.t === 'message')).toHaveLength(1);
+    events.length = 0;
+    expect(exec({ a: 'rebuildAll', text: 'rebuilt' })).toBeNull();
+    expect(events).toEqual([]);
+  });
+
+  it('dry-run compile accepts burst actions', () => {
+    const m = custom('t-burst', [
+      [40, { a: 'upgradeAll', kind: 'weapons', max: 2 }], [41, { a: 'upgradeAll', kind: 'towers' }],
+      [42, { a: 'rebuildAll' }], [43, { a: 'setOutputAll', kind: 'basicOps', output: 'scout' }],
+    ]);
+    expect(compile(m).errors).toEqual([]);
   });
 });

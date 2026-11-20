@@ -1,7 +1,7 @@
 import type { Difficulty, Emit, Mission, ScriptAction, World } from '@/types';
-import { PLAYER_IDS } from '@/types';
+import { PLAYER_IDS, ALL_UNITS } from '@/types';
 import { SPAWN_TOWER_DEFS, UNIT_DEFS, ALL_TECH_KEYS } from '@/data';
-import { MAX_COOP_PLAYERS, TICK_HZ } from '@/config/constants';
+import { MAX_COOP_PLAYERS, STORAGE_CAP, TICK_HZ } from '@/config/constants';
 import { createWorld, pathExists } from '@/sim/core';
 import { executeAction } from './actions';
 import { applyMissionSetup, startCampaign, ENEMY_ID, HUMAN_SLOT_IDS, scaleCount } from './setup';
@@ -44,10 +44,13 @@ function creditProduction(w: World, acc: Map<number, number>, dtSec: number): vo
     if (!s.output || (s.kind !== 'basicOps' && s.kind !== 'specialOps')) continue;
     const mults = SPAWN_TOWER_DEFS[s.kind].spawnMult;
     const rate = mults[Math.min(mults.length - 1, s.level)] / UNIT_DEFS[s.output].spawnSeconds;
+    const p = w.players[s.owner];
+    // A full base pauses production, as in the real production stage.
+    const room = Math.max(0, STORAGE_CAP - ALL_UNITS.reduce((n, k) => n + (p.stored[k] ?? 0), 0));
     const a = (acc.get(s.id) ?? 0) + PRODUCTION_CREDIT * dtSec * rate;
-    const n = Math.floor(a);
-    if (n > 0) w.players[s.owner].stored[s.output] = (w.players[s.owner].stored[s.output] ?? 0) + n;
-    acc.set(s.id, a - n);
+    const n = Math.min(room, Math.floor(a));
+    if (n > 0) p.stored[s.output] = (p.stored[s.output] ?? 0) + n;
+    acc.set(s.id, room > 0 ? a - Math.floor(a) : 0);
   }
 }
 

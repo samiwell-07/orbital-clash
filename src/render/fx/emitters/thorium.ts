@@ -1,5 +1,5 @@
 import { count, type Fx } from '../types';
-import { CRYSTAL, THORIUM, THORIUM_GOLD, WHITE } from '../palette';
+import { CRYSTAL, REPAIR_GREEN, THORIUM, THORIUM_GOLD, WHITE } from '../palette';
 import { emitRing } from './rings';
 
 const TAU = Math.PI * 2;
@@ -42,4 +42,29 @@ function mixCrystal(t: number): number {
 export function emitThoriumGlow(fx: Fx, x: number, z: number): void {
   fx.glow.emit(fx.now, x, 0.5, z, 0, 0.5, 0, 0.5, 0.8, 1.6, WHITE, THORIUM_GOLD, 0.7, 0);
   emitRing(fx, x, 0.1, z, 0.2, 1.1, 0.4, THORIUM, 0.7);
+}
+
+
+const TOKEN_T = 0.7;
+const TOKEN_GRAVITY = -3;
+const TOKEN_TRAIL = 5;
+
+/**
+ * Token pickup: one glowing orb lobbed from the rock (x, z) to (tx, tz) in TOKEN_T seconds with a short trail and a
+ * flash on arrival. Money (gold) lands on the base, health (green) on the ship at hover height.
+ */
+export function emitTokenFlight(fx: Fx, x: number, z: number, tx: number, tz: number, health: boolean): void {
+  if (!Number.isFinite(tx) || !Number.isFinite(tz)) return;
+  const color = health ? REPAIR_GREEN : THORIUM_GOLD;
+  const y0 = 0.5;
+  const y1 = health ? 1.0 : 0.6;
+  const vx = (tx - x) / TOKEN_T;
+  const vz = (tz - z) / TOKEN_T;
+  const vy = (y1 - y0 - 0.5 * TOKEN_GRAVITY * TOKEN_T * TOKEN_T) / TOKEN_T;
+  fx.shard.emit(fx.now, x, y0, z, vx, vy, vz, TOKEN_T, 0.42, 0.34, WHITE, color, 1, TOKEN_GRAVITY);
+  for (let i = 1; i <= count(fx, TOKEN_TRAIL); i++) {
+    const d = i * 0.05;
+    fx.shard.emit(fx.now + d, x, y0, z, vx, vy, vz, TOKEN_T - d, 0.26 - i * 0.03, 0.08, color, color, 0.6, TOKEN_GRAVITY);
+  }
+  fx.glow.emit(fx.now + TOKEN_T, tx, y1, tz, 0, 0.3, 0, 0.4, 0.5, 1.3, WHITE, color, 0.8, 0);
 }

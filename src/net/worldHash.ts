@@ -28,6 +28,11 @@ export function worldHash(w: World): number {
     pos(p.ship.y);
     mix(p.ship.cursorTx);
     mix(p.ship.cursorTy);
+    pos(p.ship.hp);
+    mix(p.ship.maxHp);
+    mix(p.ship.dead ? 1 : 0);
+    pos(p.ship.respawnTimer);
+    mix(p.ship.healing ? 1 : 0);
   }
   mix(w.structures.size);
   mix(w.units.length);

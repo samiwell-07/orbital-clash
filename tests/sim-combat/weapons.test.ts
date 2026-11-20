@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addRock, ensureFlow, flowDist, FLOW_INF, rebuild } from '@/sim/core';
 import { damageStructure, fireMissiles, registerCombatSystems, siloLoaded, siloSystem, splashUnits } from '@/sim/combat';
+import { splashShips } from '@/sim/combat/damage';
 import { MISSILE_SILO } from '@/data';
 import { createPipeline } from '@/sim/core';
 import { arena, emitter, putStructure, putUnit, putWeapon, runCombat } from './helpers';
@@ -170,5 +171,55 @@ describe('registration', () => {
     const names = createPipeline().map((p) => p.name);
     expect(names.filter((n) => n === 'combat')).toHaveLength(1);
     expect(names.indexOf('combat')).toBeLessThan(names.indexOf('projectiles'));
+  });
+});
+
+describe('weapons vs ships', () => {
+  const shipAt = (w: ReturnType<typeof arena>, id: 0 | 1, x: number, y: number) => {
+    const s = w.players[id].ship;
+    s.x = x;
+    s.y = y;
+    return s;
+  };
+
+  it('a laser shoots an enemy ship once no unit is in range, never its own ship', () => {
+    const w = arena();
+    putWeapon(w, 'laser', 0, 5, 4);
+    const own = shipAt(w, 0, 6.5, 4.5);
+    const enemy = shipAt(w, 1, 7.5, 4.5);
+    const tank = putUnit(w, 'tank', 1, 6.5, 3.5);
+    runCombat(w, 20);
+    expect(tank.hp).toBeLessThan(tank.maxHp);
+    expect(enemy.hp).toBe(enemy.maxHp);
+    tank.hp = 0;
+    tank.state = 'dead';
+    runCombat(w, 60 * 6);
+    expect(w.events).toContainEqual(expect.objectContaining({ t: 'shipHit', owner: 1, attacker: 0 }));
+    expect(w.events).toContainEqual(expect.objectContaining({ t: 'shipDestroyed', owner: 1, killer: 0 }));
+    expect(enemy.dead).toBe(true);
+    expect(own.hp).toBe(own.maxHp);
+  });
+
+  it('allied ships are never shot; turrets (ground only) ignore ships', () => {
+    const allied = arena(true);
+    putWeapon(allied, 'laser', 0, 5, 4);
+    const friend = shipAt(allied, 1, 7.5, 4.5);
+    runCombat(allied, 120);
+    expect(friend.hp).toBe(friend.maxHp);
+    const w = arena();
+    putWeapon(w, 'turret', 0, 5, 4);
+    const enemy = shipAt(w, 1, 7.5, 4.5);
+    runCombat(w, 120);
+    expect(enemy.hp).toBe(enemy.maxHp);
+  });
+
+  it('splash damages hostile ships in the radius only', () => {
+    const w = arena();
+    const own = shipAt(w, 0, 5, 5);
+    const enemy = shipAt(w, 1, 5.5, 5);
+    expect(splashShips(w, 5, 5, 1, 20, 0, 'both', emitter(w))).toBe(1);
+    expect(enemy.hp).toBeLessThan(enemy.maxHp);
+    expect(own.hp).toBe(own.maxHp);
+    expect(splashShips(w, 5, 5, 1, 20, 0, 'ground', emitter(w))).toBe(0);
   });
 });

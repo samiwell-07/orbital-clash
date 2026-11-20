@@ -39,6 +39,7 @@ function stubEnv(): RouteEnv {
   return {
     structurePos: (id: number, out: Pos) => (id === 7 ? ((out.x = 3.5), (out.y = 4.5), true) : false),
     basePos: (owner: number, out: Pos) => (owner === 0 ? ((out.x = 10.5), (out.y = 2.5), true) : false),
+    shipPos: (owner: number, out: Pos) => (owner === 0 ? ((out.x = 5), (out.y = 6), true) : false),
     hitsFrac: () => 0.4,
   };
 }

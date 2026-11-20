@@ -2,7 +2,8 @@ import type { SimEvent } from '@/types';
 
 export type FxKind =
   | 'explosion' | 'hitSparks' | 'collapse' | 'unitPop' | 'rockBurst' | 'thoriumPulse' | 'shot' | 'beam'
-  | 'baseHit' | 'baseDestroyed' | 'teleport' | 'launch' | 'build' | 'recycle' | 'repair' | 'rockSpawn';
+  | 'baseHit' | 'baseDestroyed' | 'teleport' | 'launch' | 'build' | 'recycle' | 'repair' | 'rockSpawn'
+  | 'token';
 
 /** Flat, reusable command: the router fills one instance per event, so routing allocates nothing. */
 export interface FxCmd {
@@ -29,6 +30,8 @@ export interface Pos {
 export interface RouteEnv {
   structurePos(id: number, out: Pos): boolean;
   basePos(owner: number, out: Pos): boolean;
+  /** The owner's ship (falls back to its base while the ship is dead). */
+  shipPos(owner: number, out: Pos): boolean;
   /** Remaining base hits as a 0..1 fraction. */
   hitsFrac(owner: number): number;
 }
@@ -89,6 +92,14 @@ export function routeEvent(ev: SimEvent, env: RouteEnv, out: FxCmd): boolean {
         out.ty = scratch.y;
       }
       return true;
+    case 'token': {
+      const found = ev.kind === 'money' ? env.basePos(ev.owner, scratch) : env.shipPos(ev.owner, scratch);
+      if (!found) return false;
+      set(out, 'token', ev.x, ev.y, ev.owner, ev.amount, false, ev.kind);
+      out.tx = scratch.x;
+      out.ty = scratch.y;
+      return true;
+    }
     case 'thorium':
       return env.basePos(ev.owner, scratch) && set(out, 'thoriumPulse', scratch.x, scratch.y, ev.owner, ev.amount);
     case 'baseHit':

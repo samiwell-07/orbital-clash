@@ -2,7 +2,7 @@ import type { HudApi, InputApi, PlayerId, Player, SimEvent, World } from '../../
 import type { VideoLayout } from '../../meta/settings';
 import { buildItemsFor } from '../menus/buildItems';
 import { attackSlotsFor, targetCandidates } from '../menus/attackUnits';
-import { drawBuildMenu } from '../menus/buildMenu';
+import { drawBuildMenu, drawQuickBuildHint } from '../menus/buildMenu';
 import { drawAttackMenu, drawMissileCharge } from '../menus/attackMenu';
 import { PauseMenu } from '../menus/pauseMenu';
 import type { Command } from '../screens/types';
@@ -86,7 +86,11 @@ export function createHud(opts: HudOptions = {}): Hud {
         }, layout.s, now);
       } else if (ui.menu === 'none') {
         const st = structureAt(world, p.ship.cursorTx, p.ship.cursorTy);
-        if (!st) continue;
+        if (!st) {
+          const item = p.baseBuilt ? buildItemsFor(world, p.id)[ui.buildIndex] : undefined;
+          if (item) drawQuickBuildHint(ctx, project(p.ship.cursorTx + 1.1, p.ship.cursorTy + 0.5), item, p.id, layout.s);
+          continue;
+        }
         const card = structureCard(world, st, p.id);
         const size = cardSize(card, layout.s);
         const at = project(st.tx + 1.2, st.ty + 0.5);

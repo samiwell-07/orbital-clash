@@ -18,6 +18,11 @@ export type SimEvent =
   | { t: 'rockGrabbed'; id: EntityId; owner: PlayerId }
   | { t: 'rockSmashed'; id: EntityId; x: number; y: number; thorium: number; owner: PlayerId }
   | { t: 'thorium'; owner: PlayerId; amount: number }
+  /** Visual pickup from a fully harvested rock: money flies to the base, health to the ship. */
+  | { t: 'token'; kind: 'money' | 'health'; owner: PlayerId; x: number; y: number; amount: number }
+  | { t: 'shipHit'; owner: PlayerId; hp: number; maxHp: number; attacker: PlayerId | -1 }
+  | { t: 'shipDestroyed'; owner: PlayerId; x: number; y: number; killer: PlayerId | -1 }
+  | { t: 'shipRespawned'; owner: PlayerId; x: number; y: number; hp: number; maxHp: number }
   | { t: 'baseBuilt'; owner: PlayerId; tx: number; ty: number }
   | { t: 'baseHit'; target: PlayerId; attacker: PlayerId; hitsLeft: number }
   | { t: 'baseDestroyed'; target: PlayerId; attacker: PlayerId | -1 }

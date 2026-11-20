@@ -1,6 +1,7 @@
 import type { Emit, Player, PlayerId, System, UnitKind, World } from '@/types';
 import { UNIT_DEFS } from '@/data';
 import { addUnit } from '@/sim/core';
+import { launchHp } from '@/sim/units/tuning';
 import { AIR_HEIGHT, RELEASE_RATE } from './constants';
 import { storedOf, takeStored } from './storage';
 import { attachUnit, createTrain, spacingFor, type Link } from './train';
@@ -46,10 +47,11 @@ function launchOne(w: World, p: Player, kind: UnitKind, target: PlayerId, tail: 
   takeStored(p, kind, 1);
   const x = p.baseTx + 0.5;
   const y = p.baseTy + 0.5;
+  const hp = launchHp(p.tech, kind);
   const unit = addUnit(w, {
     kind, owner: p.id, targetPlayer: target, x, y,
     z: def.layer === 'air' ? AIR_HEIGHT : 0,
-    hp: def.hp, maxHp: def.hp, layer: def.layer,
+    hp, maxHp: hp, layer: def.layer,
     trainIndex: tail ? tail.unit.trainIndex + 1 : 0,
   });
   p.stats.unitsLaunched++;

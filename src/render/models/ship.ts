@@ -1,7 +1,7 @@
-import { BoxGeometry, CircleGeometry, Color, Group, Mesh, MeshBasicMaterial, Quaternion, Vector3 } from 'three';
+import { BoxGeometry, CircleGeometry, Color, DoubleSide, Group, Mesh, MeshBasicMaterial, Quaternion, RingGeometry, Vector3 } from 'three';
 import type { BufferGeometry, Material } from 'three';
 import type { Player, Rock, World } from '@/types';
-import { SHIP_MAX_SPEED, TICK_DT } from '@/config/constants';
+import { SHIP_HP_CAP, SHIP_MAX_SPEED, TICK_DT } from '@/config/constants';
 import { assemble, box, cached, coneX, cylX, slab, sph } from '@/render/instancing/kit';
 import type { PartSpec } from '@/render/instancing/kit';
 import { TEAM_GLOW, teamIndex } from '@/render/instancing/colorTables';
@@ -10,10 +10,15 @@ import { approachAngle, clamp01 } from './motion';
 import type { FrameInfo, ModelSystem } from './types';
 
 const HOVER_Y = 1.0;
-const SHIP_SCALE = 0.4;
+const SHIP_SCALE = 0.6;
 const D = 0x30343e;
 const W = 0xffffff;
 const X_AXIS = new Vector3(1, 0, 0);
+/** HP ring: segments per full circle, how long it stays after a trigger, and its fade-out. */
+const RING_SEGS = 64;
+const RING_HOLD_S = 1.5;
+const RING_FADE_S = 0.4;
+const RING_Y = -0.12;
 
 const hullGeometry = (): BufferGeometry => assemble([
   { g: coneX(0.3, 1.6, 5), p: [0.15, 0, 0], r: [Math.PI / 5, 0, 0], c: 0xc9ced8 },
@@ -85,6 +90,11 @@ interface ShipView {
   yaw: number;
   roll: number;
   lastYaw: number;
+  ring: Group;
+  ringMax: Mesh<RingGeometry, MeshBasicMaterial>;
+  ringHp: Mesh<RingGeometry, MeshBasicMaterial>;
+  /** f.now until which the HP ring is fully shown (then fades). */
+  ringUntil: number;
 }
 
 /** One hovering craft per live player (banking from velocity, engine glow) plus a tractor beam to the carried rock. */
@@ -94,8 +104,11 @@ export class ShipSystem implements ModelSystem {
   private readonly owned: { dispose(): void }[] = [];
   private readonly dir = new Vector3();
   private readonly quat = new Quaternion();
+  /** Show every ring once on the first frame after a (re)load: the game-start reveal. */
+  private ringReveal = true;
 
   load(_world: World): void {
+    this.ringReveal = true;
     for (const v of this.views) { v?.root.removeFromParent(); v?.beam.removeFromParent(); }
     this.views.length = 0;
     for (const d of this.owned) d.dispose();
@@ -114,9 +127,36 @@ export class ShipSystem implements ModelSystem {
         continue;
       }
       if (!v) v = this.create(i);
+      if (p.ship.dead) { v.root.visible = false; v.beam.visible = false; continue; }
       v.root.visible = true;
       this.pose(v, p, f, alpha);
     }
+    this.updateRings(f);
+  }
+
+  /** HP ring visibility is driven by events (hit, respawn, game start) and the sim's healing flag. */
+  private updateRings(f: FrameInfo): void {
+    const players = f.world.players;
+    const hold = f.now + RING_HOLD_S;
+    for (const e of f.events) {
+      if (e.t !== 'shipHit' && e.t !== 'shipRespawned') continue;
+      const v = this.views[e.owner];
+      if (v) v.ringUntil = hold;
+    }
+    for (let i = 0; i < this.views.length; i++) {
+      const v = this.views[i];
+      const p = players[i];
+      if (!v || !p) continue;
+      if (this.ringReveal || p.ship.healing) v.ringUntil = hold;
+      const a = Math.min(1, Math.max(0, 1 - (f.now - v.ringUntil) / RING_FADE_S));
+      v.ring.visible = a > 0 && !p.ship.dead;
+      if (!v.ring.visible) continue;
+      setArc(v.ringMax, p.ship.maxHp);
+      setArc(v.ringHp, p.ship.hp);
+      v.ringMax.material.opacity = 0.5 * a;
+      v.ringHp.material.opacity = 0.95 * a;
+    }
+    if (this.views.length > 0) this.ringReveal = false;
   }
 
   dispose(): void {
@@ -142,7 +182,7 @@ export class ShipSystem implements ModelSystem {
     v.craft.rotation.set(v.roll, -v.yaw, -k * 0.22, 'YZX');
     v.engine.scale.set(1 + k * 0.5, 1 + 0.12 * Math.sin(f.now * 40 + p.id), 1);
     v.shadow.position.y = 0.03 - y;
-    v.shadow.scale.setScalar(0.4 - hover);
+    v.shadow.scale.setScalar(SHIP_SCALE * (1 - 2.5 * hover));
     this.updateBeam(v, p, f, x, y, z);
   }
 
@@ -177,6 +217,14 @@ export class ShipSystem implements ModelSystem {
     const shadowMat = own(new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
     const shadow = new Mesh(cached('ship:shadow', () => new CircleGeometry(1, 16).rotateX(-Math.PI / 2)), shadowMat);
     root.add(shadow);
+    const ring = new Group();
+    ring.position.y = RING_Y;
+    const ringMax = this.ringArc(0xd3d7de, 0.62, 0.74, 1, own);
+    const ringHp = this.ringArc(0x5b616c, 0.63, 0.73, 2, own);
+    ringHp.position.y = 0.004;
+    ring.add(ringMax, ringHp);
+    ring.visible = false;
+    root.add(ring);
 
     const beam = new Group();
     const beamCore = new Mesh(cached('ship:beamcore', () => new BoxGeometry(1, 0.035, 0.035)), own(beamMat(0xeaffef, 3, 0.95)));
@@ -184,8 +232,28 @@ export class ShipSystem implements ModelSystem {
     beam.add(beamCore, beamHalo);
     beam.visible = false;
     this.group.add(root, beam);
-    const v: ShipView = { root, craft, engine, beam, beamCore, shadow, yaw: -Math.PI / 2, roll: 0, lastYaw: -Math.PI / 2 };
+    const v: ShipView = { root, craft, engine, beam, beamCore, shadow, yaw: -Math.PI / 2, roll: 0, lastYaw: -Math.PI / 2,
+      ring, ringMax, ringHp, ringUntil: -Infinity,
+    };
     this.views[i] = v;
     return v;
   }
+
+  /** A flat, upward-facing ring arc starting at 12 o'clock; its length is set per frame via the draw range. */
+  private ringArc(color: number, inner: number, outer: number, order: number, own: <T extends Material>(m: T) => T): Mesh<RingGeometry, MeshBasicMaterial> {
+    const g = new RingGeometry(inner, outer, RING_SEGS, 1, Math.PI / 2, Math.PI * 2);
+    g.rotateX(-Math.PI / 2);
+    this.owned.push(g);
+    const m = own(new MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide }));
+    const mesh = new Mesh(g, m);
+    mesh.renderOrder = order;
+    return mesh;
+  }
+}
+
+/** Shows value / SHIP_HP_CAP of the full circle (each ring segment is two triangles). */
+function setArc(mesh: Mesh<RingGeometry, MeshBasicMaterial>, value: number): void {
+  const segs = Math.round(Math.min(1, Math.max(0, value / SHIP_HP_CAP)) * RING_SEGS);
+  mesh.geometry.setDrawRange(0, segs * 6);
+  mesh.visible = segs > 0;
 }

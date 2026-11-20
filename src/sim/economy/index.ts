@@ -4,9 +4,11 @@ import { handleRockIntent, rocksSystem } from './rocks';
 import { meteorSystem } from './meteors';
 import { harvestSystem } from './harvest';
 import { handleResearchIntent } from './research';
+import { shipHealthSystem } from './shipHealth';
 
 export { addThorium, spendThorium, awardBaseKillBonus } from './thorium';
-export { handleRockIntent, rocksSystem } from './rocks';
+export { handleRockIntent, rocksSystem, releaseRock } from './rocks';
+export { applyHealthToken, damageShip, destroyShip, hasShip, shipHealthSystem, shipTargetable } from './shipHealth';
 export {
   spawnInitialRocks, spawnMeteor, meteorSystem, setWorldMap, thoriumLevelOf, mapThoriumFactor, meteorInterval,
 } from './meteors';
@@ -18,7 +20,7 @@ export { ECON } from './tuning';
 
 let registered = false;
 
-/** Idempotent: wires ship, rock, meteor, harvester and research handling into the sim pipeline. */
+/** Idempotent: wires ship, ship health, rock, meteor, harvester and research handling into the sim pipeline. */
 export function registerEconomySystems(): void {
   if (!registered) {
     registered = true;
@@ -28,4 +30,5 @@ export function registerEconomySystems(): void {
   registerSystem('economy.rocks', STAGE_ORDER.rocks, rocksSystem);
   registerSystem('economy.meteors', STAGE_ORDER.rocks + 1, meteorSystem);
   registerSystem('economy.harvest', STAGE_ORDER.economy, harvestSystem);
+  registerSystem('economy.shipHealth', STAGE_ORDER.projectiles + 5, shipHealthSystem);
 }

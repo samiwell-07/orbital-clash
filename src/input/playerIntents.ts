@@ -8,17 +8,23 @@ export interface PlayerHooks {
   getBuildItems: (p: PlayerId) => readonly StructureKind[];
   getAttackUnits: (p: PlayerId) => readonly UnitKind[];
   getCursor: (p: PlayerId) => { tx: number; ty: number };
-  /** When given, upgrade/recycle/repair/cycleOutput are only emitted over an existing structure. */
+  /**
+   * When given, upgrade/recycle/repair/cycleOutput are only emitted over an existing structure, and X on an
+   * empty tile (no menu open, base built) builds the last item picked in the build menu.
+   */
   getStructureKindAt?: (tx: number, ty: number) => StructureKind | null | undefined;
   /** When given and false, X (no menu open) founds the base instead of idling. */
   hasBase?: (p: PlayerId) => boolean;
 }
 
+/** D-pad left/right in the build menu skip this many items; up/down move one. */
+const BUILD_JUMP = 4;
+
 const DIR_BUTTONS = [
-  { pad: PAD.UP, step: -1 },
-  { pad: PAD.LEFT, step: -1 },
-  { pad: PAD.DOWN, step: 1 },
-  { pad: PAD.RIGHT, step: 1 },
+  { pad: PAD.UP, step: -1, jump: false },
+  { pad: PAD.LEFT, step: -BUILD_JUMP, jump: true },
+  { pad: PAD.DOWN, step: 1, jump: false },
+  { pad: PAD.RIGHT, step: BUILD_JUMP, jump: true },
 ] as const;
 
 /** One local human: turns a per-frame PadSnapshot into intents and drives its menu state. */
@@ -28,6 +34,8 @@ export class PlayerController {
   private readonly xHold = new HoldRepeater(TUNING.cycleHoldSec, TUNING.cycleRepeatSec);
   private readonly dirRepeat = DIR_BUTTONS.map(() => new HoldRepeater(TUNING.navDelaySec, TUNING.navRepeatSec, true));
   private holdTile = '';
+  /** This X press built something: no output cycling on the new tower until X is released. */
+  private xBuilt = false;
   private grabbing = false;
   private missileDown = false;
   private missileHeld = 0;
@@ -46,6 +54,7 @@ export class PlayerController {
   /** Pushes intents for this frame into `out`. Returns true when Start was pressed. */
   update(snap: PadSnapshot, dt: number, paused: boolean, out: Intent[]): boolean {
     const e = this.edges.update(snap.buttons);
+    if (!snap.buttons[PAD.X]) this.xBuilt = false;
     if (paused) {
       out.push({ t: 'move', player: this.player, ax: 0, ay: 0 });
       this.xHold.reset();
@@ -79,10 +88,15 @@ export class PlayerController {
     if (menu === 'build') {
       this.xHold.reset();
       DIR_BUTTONS.forEach((d, i) => {
-        if (this.dirRepeat[i].update(snap.buttons[d.pad], dt) > 0) this.machine.moveBuild(d.step, items.length);
+        if (this.dirRepeat[i].update(snap.buttons[d.pad], dt) <= 0) return;
+        if (d.jump) this.machine.jumpBuild(d.step, items.length);
+        else this.machine.moveBuild(d.step, items.length);
       });
       const kind = items[this.machine.state.buildIndex];
-      if (e.pressed[PAD.X] && kind) out.push({ t: 'build', player: this.player, kind, tx: cur.tx, ty: cur.ty });
+      if (e.pressed[PAD.X] && kind) {
+        out.push({ t: 'build', player: this.player, kind, tx: cur.tx, ty: cur.ty });
+        this.xBuilt = true;
+      }
     } else {
       this.dirRepeat.forEach((r) => r.update(false, dt));
     }
@@ -91,7 +105,7 @@ export class PlayerController {
     const idx = menu === 'build' ? -1 : stickToIndex(snap.axes[AXIS.RX], snap.axes[AXIS.RY], units.length, TUNING.attackTilt);
     this.emitAttack(this.machine.updateAttack(idx, units, dt), out);
 
-    if (menu === 'none') this.freeActions(e, snap, dt, cur, kindAt, overStructure, out);
+    if (menu === 'none') this.freeActions(e, snap, dt, cur, kindAt, overStructure, items[this.machine.state.buildIndex], out);
 
     this.updateGrab(snap, out);
     this.updateMissile(snap.buttons[PAD.L2], dt, out);
@@ -110,12 +124,18 @@ export class PlayerController {
     cur: { tx: number; ty: number },
     kindAt: StructureKind | null | undefined,
     overStructure: boolean,
+    lastBuild: StructureKind | undefined,
     out: Intent[],
   ): void {
     const { tx, ty } = cur;
     const p = this.player;
     const baseMissing = this.hooks.hasBase ? !this.hooks.hasBase(p) : false;
     if (e.pressed[PAD.X] && baseMissing) out.push({ t: 'buildBase', player: p, tx, ty });
+    else if (e.pressed[PAD.X] && !overStructure && lastBuild) {
+      // Quick build: the sim validates the tile and cost and reports denials.
+      out.push({ t: 'build', player: p, kind: lastBuild, tx, ty });
+      this.xBuilt = true;
+    }
     if (e.pressed[PAD.SQUARE] && overStructure) out.push({ t: 'recycle', player: p, tx, ty });
     if (e.pressed[PAD.TRIANGLE] && overStructure) out.push({ t: 'repair', player: p, tx, ty });
 
@@ -123,7 +143,7 @@ export class PlayerController {
     if (tile !== this.holdTile) this.xHold.reset();
     this.holdTile = tile;
     const spawn = this.hooks.getStructureKindAt ? kindAt === 'basicOps' || kindAt === 'specialOps' : true;
-    const fires = this.xHold.update(snap.buttons[PAD.X] && !baseMissing, dt);
+    const fires = this.xHold.update(snap.buttons[PAD.X] && !baseMissing && !this.xBuilt, dt);
     for (let i = 0; i < fires && spawn; i++) out.push({ t: 'cycleOutput', player: p, tx, ty });
   }
 

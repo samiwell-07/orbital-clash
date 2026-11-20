@@ -41,7 +41,7 @@ function clampAxis(pos: number, vel: number, max: number): [number, number] {
 /** Accel + drag + speed cap, clamped to the map. Ships ignore structures. Heavier rocks slow acceleration. */
 export const shipSystem: System = (w, dt) => {
   for (const p of w.players) {
-    if (!p.alive) continue;
+    if (!p.alive || p.ship.dead) continue;
     const s = p.ship;
     const input = inputOf(w, p.id);
     const rock = s.carrying ? w.rocks.find((r) => r.id === s.carrying) : undefined;

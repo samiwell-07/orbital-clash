@@ -37,7 +37,7 @@ describe('Gaia and Kronos', () => {
     const seen = reachableFrom(grid, start.tx, start.ty);
     expect(grid.terrain.every((t, i) => t !== 0 || seen[i] === 1)).toBe(true);
     m.map.baseTiles.forEach((pad, i) => {
-      // Areas 29-40 play on original rock grids, which only guarantee a 3x3 pad.
+      // Areas 29-42 play on rock grids, which only guarantee a 3x3 pad.
       const original = !m.resurgence && ROCK_GRIDS.has(29 + (m.comet === 'kronos' ? 7 : 0) + m.index);
       const r = i < 2 && !original ? 3 : 1;
       for (let y = pad!.ty - r; y <= pad!.ty + r; y++) {

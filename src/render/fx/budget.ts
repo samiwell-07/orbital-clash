@@ -28,6 +28,7 @@ export const LIMITS: Readonly<Record<FxKind, Limit>> = {
   recycle: { perFrame: 4, rate: 10, burst: 4 },
   repair: { perFrame: 4, rate: 10, burst: 4 },
   rockSpawn: { perFrame: 4, rate: 10, burst: 4 },
+  token: { perFrame: 6, rate: 12, burst: 6 },
 };
 
 const KINDS = Object.keys(LIMITS) as FxKind[];

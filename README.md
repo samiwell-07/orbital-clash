@@ -29,6 +29,7 @@ npm test
 | Build menu | RB | R1 | Shift / Tab |
 | Pick build item (build menu open) | D-pad | D-pad | Arrow keys |
 | Build / modify, confirm (hold on spawn tower: cycle output) | A | Cross | E |
+| Build last picked item (menu closed, empty tile) | A | Cross | E |
 | Upgrade (build menu: close) | B | Circle | Q |
 | Recycle | X | Square | F |
 | Repair | Y | Triangle | R |

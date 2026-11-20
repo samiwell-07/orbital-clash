@@ -25,11 +25,28 @@ export interface PrePlacedStructure {
   output?: UnitKind;
 }
 
+/** Structure selector for burst actions: one kind, every weapon, or every spawn tower. */
+export type StructureGroup = StructureKind | 'weapons' | 'towers';
+
 /** Scripted enemy actions. Validated at mission load; failures surface as missionError. */
 export type ScriptAction =
   | { a: 'build'; kind: StructureKind; tx: number; ty: number; level?: number; output?: UnitKind }
   | { a: 'upgrade'; tx: number; ty: number }
   | { a: 'setOutput'; tx: number; ty: number; output: UnitKind }
+  /**
+   * Burst: upgrades every owned structure of `kind` below min(`cap`, max level) by one level (at most `max`
+   * of them, lowest level first, then id), self-funded. No eligible structure is a no-op. `text` is shown
+   * only when something was upgraded.
+   */
+  | { a: 'upgradeAll'; kind: StructureGroup; max?: number; cap?: number; text?: string }
+  /**
+   * Burst: re-places, for free, every original preplaced structure of the owner whose tile is empty again,
+   * at its original level/output. Occupied, blocked or path-sealing tiles are skipped. `text` is shown only
+   * when something was rebuilt.
+   */
+  | { a: 'rebuildAll'; text?: string }
+  /** Burst: sets `output` on every owned tower of `kind` that offers it at its level (none = no-op). */
+  | { a: 'setOutputAll'; kind: 'basicOps' | 'specialOps'; output: UnitKind; text?: string }
   | { a: 'release'; kind: UnitKind | 'all'; count: number | 'all' }
   | { a: 'grantThorium'; amount: number }
   | { a: 'unlock'; key: string }

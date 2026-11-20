@@ -26,6 +26,23 @@ export const SHIP_ACCEL = 40;
 export const SHIP_MAX_SPEED = 11;
 export const SHIP_DRAG = 6;
 
+/** Ship health: starts at 25, +10 max per health token (cap 100), -20 max per death (floor 25). */
+export const SHIP_HP_START = 25;
+export const SHIP_HP_PER_TOKEN = 10;
+export const SHIP_HP_CAP = 100;
+export const SHIP_DEATH_PENALTY = 20;
+export const SHIP_RESPAWN_S = 1.5;
+/** Seconds for a full (SHIP_HP_CAP) heal while hovering over the own base. */
+export const SHIP_FULL_HEAL_S = 8;
+/** Max distance (tiles) from the base centre that still counts as over the base. */
+export const SHIP_HEAL_RADIUS = 0.6;
+/** Weapon damage multiplier against ships (ships fly on the air layer). */
+export const SHIP_DAMAGE_MULT = 0.4;
+/** Hit radius of a ship for homing shots (tiles). */
+export const SHIP_HIT_RADIUS = 0.35;
+/** Chance a fully harvested rock also drops a health token, by rock size. */
+export const HEALTH_TOKEN_CHANCE: Readonly<Record<1 | 2 | 3, number>> = { 1: 0.1, 2: 0.35, 3: 0.8 };
+
 /** Attack-menu pips: white = 1, blue = 10, red = 100 units. */
 export const PIP_VALUES = [1, 10, 100] as const;
 

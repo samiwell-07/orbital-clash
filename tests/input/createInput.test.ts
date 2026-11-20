@@ -18,6 +18,10 @@ describe('PlayerUiMachine', () => {
     expect(m.state.buildIndex).toBe(3);
     m.moveBuild(1, 4);
     expect(m.state.buildIndex).toBe(0);
+    for (const [step, want] of [[4, 4], [4, 8], [4, 9], [4, 0], [-4, 9], [-4, 5], [-4, 1], [-4, 0]] as const) {
+      m.jumpBuild(step, 10);
+      expect(m.state.buildIndex).toBe(want);
+    }
     m.toggleAttackDisplay();
     expect(m.state.attackShown).toBe(true);
     expect(m.menu).toBe('build');
@@ -70,7 +74,11 @@ function fakePad() {
   return { pad, set, axes };
 }
 
-function setup(withPad = true, structure?: (tx: number, ty: number) => StructureKind | null) {
+function setup(
+  withPad = true,
+  structure?: (tx: number, ty: number) => StructureKind | null,
+  hasBase?: (p: PlayerId) => boolean,
+) {
   const f = fakePad();
   const kb = createKeyboard(null);
   const items: StructureKind[] = ['turret', 'laser', 'basicOps'];
@@ -80,6 +88,7 @@ function setup(withPad = true, structure?: (tx: number, ty: number) => Structure
     getAttackUnits: () => UNITS,
     getCursor: () => ({ tx: 5, ty: 6 }),
     getStructureKindAt: structure,
+    hasBase,
     getGamepads: () => (withPad ? [f.pad] : []),
     keyboard: kb,
   });
@@ -150,7 +159,44 @@ describe('createInput (gamepad)', () => {
   it('hold X does nothing over a non-spawn structure', () => {
     const { f, frame } = setup(true, () => 'turret');
     f.set(PAD.X, true);
-    for (let i = 0; i < 10; i++) expect(frame(0.1).some((x) => x.t === 'cycleOutput')).toBe(false);
+    for (let i = 0; i < 10; i++) {
+      const out = frame(0.1);
+      expect(out.some((x) => x.t === 'cycleOutput' || x.t === 'build')).toBe(false);
+    }
+  });
+
+  it('X on an empty tile with no menu open builds the last picked item; holding it does not cycle the new tower', () => {
+    let at: StructureKind | null = null;
+    const { f, input, frame } = setup(true, () => at, () => true);
+    f.set(PAD.R1, true);
+    frame();
+    f.set(PAD.R1, false);
+    f.set(PAD.UP, true);
+    frame();
+    f.set(PAD.UP, false);
+    f.set(PAD.R1, true);
+    frame();
+    f.set(PAD.R1, false);
+    expect(input.ui(0)).toMatchObject({ menu: 'none', buildIndex: 2 });
+    f.set(PAD.X, true);
+    expect(frame()).toContainEqual({ t: 'build', player: 0, kind: 'basicOps', tx: 5, ty: 6 });
+    at = 'basicOps';
+    for (let i = 0; i < 10; i++) expect(frame().some((x) => x.t === 'cycleOutput' || x.t === 'build')).toBe(false);
+    f.set(PAD.X, false);
+    frame();
+    f.set(PAD.X, true);
+    const held: Intent[] = [];
+    for (let i = 0; i < 5; i++) held.push(...frame());
+    expect(held.some((x) => x.t === 'build')).toBe(false);
+    expect(held).toContainEqual({ t: 'cycleOutput', player: 0, tx: 5, ty: 6 });
+  });
+
+  it('X with no base founds the base instead of quick-building', () => {
+    const { f, frame } = setup(true, () => null, () => false);
+    f.set(PAD.X, true);
+    const out = frame();
+    expect(out).toContainEqual({ t: 'buildBase', player: 0, tx: 5, ty: 6 });
+    expect(out.some((x) => x.t === 'build')).toBe(false);
   });
 
   it('right stick attacks without opening anything; R3 only shows the menu; L1 cycles target', () => {
@@ -250,6 +296,12 @@ describe('createInput (keyboard fallback)', () => {
     frame();
     kb.release('ShiftLeft');
     expect(input.ui(0).menu).toBe('build');
+    kb.press('KeyE');
+    expect(frame()).toContainEqual({ t: 'build', player: 0, kind: 'turret', tx: 5, ty: 6 });
+  });
+
+  it('E on an empty tile quick-builds the last picked item with the menu closed', () => {
+    const { kb, frame } = setup(false, () => null, () => true);
     kb.press('KeyE');
     expect(frame()).toContainEqual({ t: 'build', player: 0, kind: 'turret', tx: 5, ty: 6 });
   });

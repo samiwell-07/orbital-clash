@@ -4,6 +4,7 @@ import { buildRun, type RunSpec, type StartCommand } from '@/app/runSpec';
 import { createNetSession } from '@/app/netSession';
 import { createLoopbackHub } from '@/net/loopback';
 import { worldHash } from '@/net/worldHash';
+import { makeWorld } from '../sim-core/helpers';
 import { createKeyboard } from '@/input/keyboard';
 import { PAD } from '@/input/bindings';
 import type { GamepadLike } from '@/input/gamepad';
@@ -146,5 +147,24 @@ describe('online lockstep session', () => {
     }
     expect(a.sim.world.tick).toBeGreaterThan(20);
     expect(worldHash(a.sim.world)).toBe(worldHash(b.sim.world));
+  });
+});
+
+describe('worldHash', () => {
+  it('covers ship health state', () => {
+    const w = makeWorld();
+    const s = w.players[1].ship;
+    const seen = new Set([worldHash(w)]);
+    s.hp -= 3;
+    seen.add(worldHash(w));
+    s.maxHp += 10;
+    seen.add(worldHash(w));
+    s.dead = true;
+    seen.add(worldHash(w));
+    s.respawnTimer = 0.5;
+    seen.add(worldHash(w));
+    s.healing = true;
+    seen.add(worldHash(w));
+    expect(seen.size).toBe(6);
   });
 });

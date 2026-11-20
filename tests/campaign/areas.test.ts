@@ -72,9 +72,9 @@ describe('authored areas', () => {
     });
   });
 
-  it('areas 1-40 play on their original rock grid (X = rock) and only Resurgences keep generated maps', () => {
+  it('areas 1-42 play on their rock grid (X = rock) and only Resurgences keep generated maps', () => {
     const numbered = missionSummaries().filter((s) => !s.resurgence);
-    expect(ROCK_GRIDS.size).toBe(40);
+    expect(ROCK_GRIDS.size).toBe(42);
     for (const [n, rows] of ROCK_GRIDS) {
       const s = numbered.find((a) => a.number === n)!;
       const m = getMission(s.comet, s.index)!;
@@ -96,15 +96,16 @@ describe('authored areas', () => {
     }
   });
 
-  it('retains the original build schedule sizes even on the more confined plateaus', () => {
+  it('starts fully geared: every enemy structure is preplaced, even on the more confined plateaus', () => {
     // Areas 1–7 followed by the Resurgence; Layout.pick can silently return too few sites.
-    const builds = {
-      kreios: [4, 4, 5, 5, 7, 7, 8, 14], hathor: [7, 8, 9, 9, 9, 11, 10, 15],
-      aether: [10, 11, 12, 12, 12, 11, 13, 15], helios: [14, 14, 14, 15, 15, 15, 15, 16],
+    const total = {
+      kreios: [6, 6, 7, 7, 10, 10, 11, 19], hathor: [10, 11, 12, 12, 12, 15, 14, 20],
+      aether: [14, 15, 16, 16, 16, 15, 17, 20], helios: [18, 18, 18, 20, 20, 20, 20, 21],
     };
     for (const m of ALL_MISSIONS) {
       if (m.comet === 'gaia' || m.comet === 'kronos') throw new Error(`unexpected expansion mission: ${m.id}`);
-      expect(m.timeline.filter((e) => e.action.a === 'build'), m.id).toHaveLength(builds[m.comet][m.resurgence ? 7 : m.index]);
+      expect(m.timeline.filter((e) => e.action.a === 'build' || e.action.a === 'upgrade'), m.id).toEqual([]);
+      expect(m.preplaced.filter((p) => p.owner === 1), m.id).toHaveLength(total[m.comet][m.resurgence ? 7 : m.index]);
     }
   });
 

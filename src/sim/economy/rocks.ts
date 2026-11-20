@@ -1,19 +1,24 @@
 import type { Emit, Intent, Rock, Ship, System, World } from '@/types';
-import { rand, randRange, isTerrainBlocked } from '@/sim/core';
 import { ECON } from './tuning';
 
 /** Heading (radians) of the ship towing each rock; the rock sits on that heading, in front of the nose. */
 const towAngle = new WeakMap<Rock, number>();
 
-function release(w: World, r: Rock): void {
+/** Drops a towed rock: it keeps the ship's velocity forever (drifting, no drag), or lands if the ship was still. */
+export function releaseRock(w: World, r: Rock): void {
+  let vx = 0;
+  let vy = 0;
   if (r.carriedBy !== -1) {
     const ship = w.players[r.carriedBy].ship;
     if (ship.carrying === r.id) ship.carrying = 0;
+    vx = ship.vx;
+    vy = ship.vy;
   }
-  r.state = 'landed';
+  const moving = Math.hypot(vx, vy) >= ECON.throwRestSpeed;
+  r.state = moving ? 'drifting' : 'landed';
   r.carriedBy = -1;
-  r.vx = 0;
-  r.vy = 0;
+  r.vx = moving ? vx : 0;
+  r.vy = moving ? vy : 0;
   towAngle.delete(r);
 }
 
@@ -36,10 +41,10 @@ function placeInFront(r: Rock, ship: Ship, angle: number): void {
 export function handleRockIntent(w: World, intent: Intent, emit: Emit): boolean {
   if (intent.t !== 'grab' && intent.t !== 'drop') return false;
   const p = w.players[intent.player];
-  if (!p || !p.alive) return true;
+  if (!p || !p.alive || p.ship.dead) return true;
   if (intent.t === 'drop') {
     const held = w.rocks.find((r) => r.id === p.ship.carrying);
-    if (held) release(w, held);
+    if (held) releaseRock(w, held);
     p.ship.carrying = 0;
     return true;
   }
@@ -72,6 +77,7 @@ function compact(w: World): void {
   w.rocks.length = j;
 }
 
+/** Drifting rocks keep a constant velocity over terrain and structures until caught, grabbed or off the map. */
 function drift(w: World, r: Rock, dt: number): void {
   r.x += r.vx * dt;
   r.y += r.vy * dt;
@@ -79,26 +85,17 @@ function drift(w: World, r: Rock, dt: number): void {
   const out = 3;
   if (r.x < -out || r.y < -out || r.x > w.grid.w + out || r.y > w.grid.h + out) {
     r.state = 'smashed'; // left the map: silently removed, no payout or event
-    return;
-  }
-  const m = ECON.landMargin;
-  const inside = r.x > m && r.y > m && r.x < w.grid.w - m && r.y < w.grid.h - m;
-  if (inside && !isTerrainBlocked(w.grid, Math.floor(r.x), Math.floor(r.y)) && rand(w) < ECON.landPerSecond * dt) {
-    r.state = 'landed';
-    r.vx = 0;
-    r.vy = 0;
-    r.spin += randRange(w, 0, 1);
   }
 }
 
-/** Drifting rocks fly and land; towed rocks ride in front of their ship. Harvesting rocks belong to harvest.ts. */
+/** Drifting rocks fly straight on; towed rocks ride in front of their ship. Harvesting rocks belong to harvest.ts. */
 export const rocksSystem: System = (w, dt) => {
   compact(w);
   for (const r of w.rocks) {
     if (r.state === 'grabbed') {
       const ship = r.carriedBy === -1 ? null : w.players[r.carriedBy].ship;
       if (!ship || ship.carrying !== r.id) {
-        release(w, r);
+        releaseRock(w, r);
         continue;
       }
       const cur = towAngle.get(r) ?? shipHeading(ship, 0);

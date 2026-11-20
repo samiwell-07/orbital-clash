@@ -1,6 +1,8 @@
 import type { Emit, PlayerId, Structure, TargetMask, Unit, World } from '@/types';
 import { queryRadius, removeStructure } from '@/sim/core';
-import { canHit, hostile } from './targeting';
+import { SHIP_DAMAGE_MULT } from '@/config/constants';
+import { damageShip, shipTargetable } from '@/sim/economy/shipHealth';
+import { canHit, hostile, SHIP_LAYER } from './targeting';
 
 export type DeathHook = (w: World, unit: Unit, emit: Emit) => void;
 const deathHooks: DeathHook[] = [];
@@ -81,4 +83,22 @@ export function splashStructures(w: World, x: number, y: number, radius: number,
   }
   for (const s of hit) damageStructure(w, s, amount, owner, emit);
   return hit.length;
+}
+
+/**
+ * Weapon splash on ships: every live hostile ship within the radius takes `amount` scaled by SHIP_DAMAGE_MULT
+ * (ships count as air for the mask). Never hurts allies. Returns how many ships were hit.
+ */
+export function splashShips(
+  w: World, x: number, y: number, radius: number, amount: number, owner: PlayerId, mask: TargetMask, emit: Emit,
+): number {
+  if (!canHit(mask, SHIP_LAYER)) return 0;
+  let n = 0;
+  for (const p of w.players) {
+    if (!shipTargetable(p) || !hostile(w, owner, p.id)) continue;
+    if ((p.ship.x - x) ** 2 + (p.ship.y - y) ** 2 > radius * radius) continue;
+    damageShip(w, p.id, amount * SHIP_DAMAGE_MULT, owner, emit);
+    n++;
+  }
+  return n;
 }

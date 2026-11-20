@@ -1,6 +1,6 @@
 import type { Controller, MapDef, NewGameOptions, Player, PlayerId, World } from '@/types';
 import { PLAYER_IDS } from '@/types';
-import { DEFAULT_HITS, DIFFICULTY_MULT, MAX_HITS, MIN_HITS } from '@/config/constants';
+import { DEFAULT_HITS, DIFFICULTY_MULT, MAX_HITS, MAX_PLAYERS, MIN_HITS, SHIP_HP_START } from '@/config/constants';
 import { createGrid } from './grid';
 import { resolveMap } from './defaultMap';
 import { seedRng } from './rng';
@@ -33,7 +33,10 @@ function emptyPlayer(id: PlayerId): Player {
     maxHits: DEFAULT_HITS,
     stored: {},
     attack: { selected: null, locked: false, targetPlayer: id },
-    ship: { x: 0, y: 0, vx: 0, vy: 0, cursorTx: 0, cursorTy: 0, carrying: 0 },
+    ship: {
+      x: 0, y: 0, vx: 0, vy: 0, cursorTx: 0, cursorTy: 0, carrying: 0,
+      hp: SHIP_HP_START, maxHp: SHIP_HP_START, dead: false, respawnTimer: 0, healing: false,
+    },
     stats: {
       kills: 0, unitsLost: 0, unitsLaunched: 0, thoriumEarned: 0,
       structuresBuilt: 0, basesDestroyed: 0, penaltySec: 0,
@@ -50,7 +53,7 @@ export function createWorld(opts: NewGameOptions): World {
   const { settings, slots } = opts;
   const map = pickMap(opts);
   const mission = settings.mission;
-  const players = PLAYER_IDS.map(emptyPlayer);
+  const players = PLAYER_IDS.filter((id) => settings.mode === 'campaign' || id < MAX_PLAYERS).map(emptyPlayer);
   const diff = DIFFICULTY_MULT[settings.difficulty];
 
   for (const slot of slots) {
@@ -101,7 +104,7 @@ export function createWorld(opts: NewGameOptions): World {
     winnerTeam: -1,
     settings: { ...settings, strength: [...settings.strength] },
     grid: createGrid(map),
-    flows: [null, null, null, null],
+    flows: players.map(() => null),
     players,
     structures: new Map(),
     units: [],

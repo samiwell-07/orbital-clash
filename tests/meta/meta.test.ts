@@ -210,6 +210,16 @@ describe('save and campaign unlocks', () => {
     expect(loadSave(throwing).lastPlayed).toBeNull();
     expect(saveSave(s, throwing)).toBe(false);
   });
+  it('preserves four-player campaign completions through saving and loading', () => {
+    const st = memoryStorage();
+    const { save } = recordAreaComplete(newSave(), {
+      cometId: 'gaia', index: 0, difficulty: 'expert', timeSec: 80, penaltySec: 0, score: 9000, coopPlayers: 4,
+    });
+    expect(saveSave(save, st)).toBe(true);
+    const loaded = loadSave(st);
+    expect(loaded.comets.gaia.areas[0]?.coopPlayers).toBe(4);
+    expect(loaded.lastPlayed).toMatchObject({ difficulty: 'expert', coopPlayers: 4 });
+  });
   it('clamps out-of-range settings', () => {
     const st = sanitizeSettings({ masterVolume: 9, videoLayout: '4:3', defaultDifficulty: 'nope', lastBattle: { players: 99, maxHits: -3 } });
     expect([st.masterVolume, st.videoLayout, st.defaultDifficulty, st.lastBattle.players, st.lastBattle.maxHits]).toEqual([1, '4:3', 'normal', 4, 1]);

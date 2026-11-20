@@ -5,7 +5,7 @@ import type { MapSpec } from './builders';
 import { Layout } from './layout';
 import { rockGridMap } from './rockGrids';
 import { registerSeed } from './seeds';
-import { Script } from './script';
+import { Script, scheduleBursts } from './script';
 
 export const ORIGINAL_COMETS = ['kreios', 'hathor', 'aether', 'helios'] as const;
 export type OriginalComet = (typeof ORIGINAL_COMETS)[number];
@@ -84,21 +84,19 @@ function buildScript(comet: OriginalComet, spec: AreaSpec, enemyTech: Set<string
   s.message(0, `${spec.name}: the aliens are dug in. Hold your lines and strike their base.`);
 
   const defs = layout.pick(2 + ai, layout.enemy, 2, 8, true);
-  defs.forEach((t, i) => s.build(6 + Math.round((i * par * 0.45) / defs.length), weapons[(i + 1) % weapons.length], t.tx, t.ty));
+  defs.forEach((t, i) => s.preplace(weapons[(i + 1) % weapons.length], t.tx, t.ty));
   const towers = units.filter((u) => u !== 'scout');
   const basics = towers.filter((u) => BASIC_LEVEL[u] !== undefined);
   const specials = towers.filter((u) => BASIC_LEVEL[u] === undefined);
   const slots = layout.pick(basics.length + (specials.length > 0 ? 1 : 0), layout.enemy, 2, 6, false);
-  basics.forEach((u, i) => slots[i] && s.build(at(0.12) + i * 4, 'basicOps', slots[i].tx, slots[i].ty, BASIC_LEVEL[u] as number, u));
+  basics.forEach((u, i) => slots[i] && s.preplace('basicOps', slots[i].tx, slots[i].ty, BASIC_LEVEL[u] as number, u));
   const sp = slots[basics.length];
   if (sp && specials.length > 0) {
-    s.build(at(0.2), 'specialOps', sp.tx, sp.ty, 0, specials[0]);
-    if (specials[1]) s.setOutput(at(0.55), sp.tx, sp.ty, specials[1]);
+    s.preplace('specialOps', sp.tx, sp.ty, 0, specials[0]);
+    if (specials[1]) s.setOutputAll(at(0.55), 'specialOps', specials[1]);
   }
-  const ups = [...front, ...defs.slice(0, 1 + Math.floor(ai / 2))];
-  ups.forEach((t, i) => {
-    if (i < 3) s.upgrade(at(0.35) + i * 6, t.tx, t.ty);
-  });
+  // Fully geared from t=0; the enemy then acts in bursts (see scheduleBursts), never before FIRST_BURST_MIN.
+  scheduleBursts(s, { par, ai, end: at(0.9) - 3, cap: Math.min(3, 1 + Math.floor(ai / 3)) });
 
   const waves = 3 + Math.ceil(ai * 0.6) + (resurgence ? 2 : 0);
   const t0 = Math.max(resurgence ? at(0.1) : at(0.2), 30);

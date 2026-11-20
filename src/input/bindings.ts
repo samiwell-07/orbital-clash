@@ -102,8 +102,9 @@ export const NAV_KEYS = { confirm: ['Enter', 'NumpadEnter'], back: ['Backspace']
 export const BINDING_ROWS: readonly { action: string; xbox: string; ps: string; p1: string; p2: string }[] = [
   { action: 'Move ship', xbox: 'Left stick / D-pad', ps: 'Left stick / D-pad', p1: 'W A S D', p2: 'I J K L' },
   { action: 'Build menu (open/close)', xbox: 'RB', ps: 'R1', p1: 'Shift / Tab', p2: 'N' },
-  { action: 'Pick build item (build menu open)', xbox: 'D-pad', ps: 'D-pad', p1: 'Arrow keys', p2: 'Numpad 8 4 2 6' },
+  { action: 'Pick build item (build menu open)', xbox: 'D-pad (←/→ skip 4)', ps: 'D-pad (←/→ skip 4)', p1: 'Arrow keys', p2: 'Numpad 8 4 2 6' },
   { action: 'Build / modify, confirm', xbox: 'A', ps: 'Cross', p1: 'E', p2: 'U' },
+  { action: 'Empty tile, menu closed: build last picked item', xbox: 'A', ps: 'Cross', p1: 'E', p2: 'U' },
   { action: 'Hold on spawn tower: cycle output', xbox: 'Hold A', ps: 'Hold Cross', p1: 'Hold E', p2: 'Hold U' },
   { action: 'Upgrade tower (build menu: close)', xbox: 'B', ps: 'Circle', p1: 'Q', p2: 'O' },
   { action: 'Recycle tower', xbox: 'X', ps: 'Square', p1: 'F', p2: 'Y' },

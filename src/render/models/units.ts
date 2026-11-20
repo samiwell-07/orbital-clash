@@ -6,7 +6,7 @@ import type { UnitKind, World } from '@/types';
 import { ALL_UNITS } from '@/types';
 import { InstancedPool } from '@/render/instancing/InstancedPool';
 import { composeYaw } from '@/render/instancing/kit';
-import { VIS, getUnitModel, disposeUnitModels } from '@/render/instancing/unitGeometries';
+import { GROUND_FOOTPRINT, getUnitModel, disposeUnitModels, visualScale } from '@/render/instancing/unitGeometries';
 import { jitterFactor, teamIndex, unitTint } from '@/render/instancing/colorTables';
 import { bobHeight, clamp01, snakeBobPhase } from './motion';
 import { unitBodyMat, unitGlowMat } from './materials';
@@ -66,7 +66,7 @@ export class UnitSystem implements ModelSystem {
       }
       const px = u.x + ch * step;
       const pz = u.y + sh * step;
-      const sc = def.radius * VIS[u.kind];
+      const sc = visualScale(u.kind);
       composeYaw(m, px, y, pz, ch, sh, sc, sc, sc);
       const j = jitterFactor(u.id);
       const hp = u.maxHp > 0 ? 0.55 + 0.45 * clamp01(u.hp / u.maxHp) : 1;
@@ -74,7 +74,7 @@ export class UnitSystem implements ModelSystem {
       set.body.push(m, j * hp * t[0], j * hp * t[1], j * hp * t[2]);
       set.glow.push(m, j, j, j);
       if (hover !== undefined || u.layer === 'air') {
-        const sr = def.radius * 0.85 * (1 - Math.min(0.4, y * 0.25));
+        const sr = (def.layer === 'ground' ? GROUND_FOOTPRINT * 0.5 : def.radius) * 0.85 * (1 - Math.min(0.4, y * 0.25));
         composeYaw(m, px + y * 0.25, 0.03, pz + y * 0.35, 1, 0, sr, 1, sr);
         this.shadow.push(m);
       }

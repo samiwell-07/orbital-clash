@@ -5,7 +5,11 @@ import {
 } from '@/render/instancing/colorTables';
 import { PLAYER_COLORS, ALL_UNITS } from '@/types';
 import { GROWN_VARIANT, maxLevelOf, platformVariant, upgradeMarks } from '@/render/models/structures/marks';
-import { crackGlow, damageDarken, flicker, hpRatio, shieldRing, smokeAmount, storageGlow } from '@/render/models/damage';
+import { crackGlow, damageDarken, flicker, hpRatio, smokeAmount } from '@/render/models/damage';
+import { baseBrightness } from '@/render/models/base';
+import { GROUND_FOOTPRINT, VIS, modelFootprint, visualScale } from '@/render/instancing/unitGeometries';
+import { UNIT_DEFS } from '@/data';
+import type { Player } from '@/types';
 import { angleDiff, approachAngle, bobHeight, snakeBobPhase } from '@/render/models/motion';
 import { BoxGeometry, Matrix4, Mesh, MeshBasicMaterial } from 'three';
 import type { Material, MeshStandardMaterial } from 'three';
@@ -165,13 +169,32 @@ describe('damage maths', () => {
     }
   });
 
-  it('dims base shield rings from the outside as hits approach maxHits', () => {
-    expect(shieldRing(0, 3, 0, 10)).toBe(1);
-    expect(shieldRing(2, 3, 0, 10)).toBe(1);
-    expect(shieldRing(2, 3, 5, 10)).toBeLessThan(shieldRing(0, 3, 5, 10));
-    expect(shieldRing(0, 3, 10, 10)).toBeCloseTo(0.12, 5);
-    expect(storageGlow(0, 1000)).toBeLessThan(storageGlow(10, 1000));
-    expect(storageGlow(1000, 1000)).toBeCloseTo(1, 5);
+});
+
+describe('base sphere brightness', () => {
+  const player = (o: Partial<Player> = {}, ship: object = {}): Player => ({
+    id: 0, alive: true, stored: {}, attack: { selected: null, locked: false, targetPlayer: 1 }, ...o, ship,
+  }) as unknown as Player;
+
+  it('stays dim at idle and goes full while launching, lock-attacking with stock, or healing', () => {
+    for (let t = 0; t < 5; t += 0.1) expect(baseBrightness(player(), t, -99)).toBeLessThan(0.4);
+    expect(baseBrightness(player(), 10, 9.7)).toBe(1);
+    expect(baseBrightness(player(), 10, 9.5)).toBeLessThan(0.4);
+    const locked: Partial<Player> = { attack: { selected: 'tank', locked: true, targetPlayer: 1 } };
+    expect(baseBrightness(player({ ...locked, stored: { tank: 3 } }), 1, -99)).toBe(1);
+    expect(baseBrightness(player({ ...locked, stored: { tank: 0 } }), 1, -99)).toBeLessThan(0.4);
+    expect(baseBrightness(player({}, { healing: true }), 1, -99)).toBe(1);
+    expect(baseBrightness(player({ alive: false }, { healing: true }), 1, 0.9)).toBeLessThan(0.1);
+  });
+});
+
+describe('unit visual scale', () => {
+  it('fits every ground kind to the ground footprint and keeps air kinds at radius * VIS', () => {
+    for (const k of Object.keys(UNIT_DEFS) as (keyof typeof UNIT_DEFS)[]) {
+      const def = UNIT_DEFS[k];
+      if (def.layer === 'ground') expect(modelFootprint(k) * visualScale(k)).toBeCloseTo(GROUND_FOOTPRINT, 5);
+      else expect(visualScale(k)).toBe(def.radius * VIS[k]);
+    }
   });
 });
 

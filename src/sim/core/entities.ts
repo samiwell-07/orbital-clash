@@ -98,6 +98,7 @@ export function addProjectile(w: World, p: ProjectileInit): Projectile {
     damage: p.damage ?? 0,
     splash: p.splash ?? 0,
     targetId: p.targetId ?? 0,
+    targetShip: p.targetShip ?? -1,
     life: p.life ?? 1,
     layerMask: p.layerMask ?? 'both',
   };

@@ -1,5 +1,5 @@
 import type { CometId, Difficulty } from '../types';
-import { SAVE_KEY } from '../config/constants';
+import { MAX_COOP_PLAYERS, SAVE_KEY } from '../config/constants';
 import type { KeyValueStorage } from './storage';
 import { browserStorage } from './storage';
 import { computeRank, betterRank, effectiveTime } from './rank';
@@ -97,7 +97,7 @@ export function getArea(save: SaveData, cometId: CometId, index: number, resurge
 export function recordAreaComplete(save: SaveData, input: AreaCompleteInput): AreaCompleteResult {
   const { cometId, index, difficulty, timeSec, penaltySec, score } = input;
   const resurgence = input.resurgence === true;
-  const coopPlayers = Math.min(3, Math.max(1, input.coopPlayers ?? 1));
+  const coopPlayers = Math.min(MAX_COOP_PLAYERS, Math.max(1, input.coopPlayers ?? 1));
   const rank = input.parTimeSec === undefined ? 'D' : computeRank(timeSec, penaltySec, input.parTimeSec, difficulty);
   const effective = effectiveTime(timeSec, penaltySec);
   const prev = getArea(save, cometId, index, resurgence);

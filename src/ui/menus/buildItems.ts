@@ -1,10 +1,11 @@
 import type { PlayerId, StructureKind, World } from '../../types';
 import { DEFS, isUnlocked, researchDef } from '../../data';
 
-/** Menu order: the four weapons, the two spawn towers, then support structures. */
+/** Menu order: economy/missile support first, then the four weapons, the two spawn towers and the rest. */
 const ORDER: readonly StructureKind[] = [
+  'harvester', 'researchLab', 'missileSilo', 'missileDefense',
   'turret', 'laser', 'pulsar', 'bomber', 'basicOps', 'specialOps',
-  'gateway', 'waypoint', 'harvester', 'researchLab', 'missileSilo', 'missileDefense',
+  'gateway', 'waypoint',
 ];
 
 export interface BuildItem {

@@ -3,7 +3,7 @@ import { RECYCLE_FULL, REPAIR_FULL } from '../../src/config/constants';
 import { ALL_UNITS, WEAPONS } from '../../src/types';
 import type { StructureKind } from '../../src/types';
 import {
-  ALL_TECH_KEYS, BIONIC_TECH_KEYS, DEFS, RESEARCH_DEFS, SPAWN_TOWER_DEFS, SUPPORT_DEFS, TECH_STRUCTURES, TECH_UNITS, TECH_WEAPONS,
+  ALL_TECH_KEYS, BIONIC_TECH_KEYS, DEFS, RESEARCH_DEFS, SPAWN_TOWER_DEFS, SUPPORT_DEFS, TECH_STRUCTURES, TECH_UNITS, TECH_UPGRADES, TECH_WEAPONS,
   UNIT_DEFS, WEAPON_DEFS, allTech, createDefs, isUnlocked,
 } from '../../src/data';
 
@@ -108,7 +108,7 @@ describe('spawn towers and support', () => {
 describe('research', () => {
   it('contains exactly the campaign keys, with Bionic research kept apart', () => {
     expect([...ALL_TECH_KEYS].sort()).toEqual([...CAMPAIGN_KEYS].sort());
-    expect([...BIONIC_TECH_KEYS].sort()).toEqual(['dragonSwarm', 'missileDefense', 'missileSilo', 'snakeSwarm']);
+    expect([...BIONIC_TECH_KEYS].sort()).toEqual(['dragonSwarm', 'kamikaze', 'missileDefense', 'missileSilo', 'snakeSwarm']);
     expect(RESEARCH_DEFS.every((r) => r.cost > 0)).toBe(true);
     expect(Object.keys(allTech()).sort()).toEqual([...ALL_TECH_KEYS].sort());
   });
@@ -128,7 +128,10 @@ describe('research', () => {
     for (const [key, unit] of Object.entries(TECH_UNITS)) expect(UNIT_DEFS[unit].requires).toBe(key);
     for (const [key, w] of Object.entries(TECH_WEAPONS)) expect(WEAPON_DEFS[w].requires).toBe(key);
     for (const [key, s] of Object.entries(TECH_STRUCTURES)) expect(DEFS.support(s).requires).toBe(key);
-    const mapped = new Set([...Object.keys(TECH_UNITS), ...Object.keys(TECH_WEAPONS), ...Object.keys(TECH_STRUCTURES)]);
+    for (const unit of Object.values(TECH_UPGRADES)) expect(UNIT_DEFS[unit]).toBeDefined();
+    const mapped = new Set([
+      ...Object.keys(TECH_UNITS), ...Object.keys(TECH_WEAPONS), ...Object.keys(TECH_STRUCTURES), ...Object.keys(TECH_UPGRADES),
+    ]);
     for (const k of keys) expect(mapped.has(k)).toBe(true);
   });
   it('isUnlocked handles null, missing and set keys', () => {

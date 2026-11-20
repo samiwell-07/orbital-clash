@@ -51,6 +51,7 @@ PS3 pad actions from the manual, mapped to our inputs. `Intent` types in `src/ty
 | Open build menu | R1 | RB | E | menu `build` |
 | Navigate menu | d-pad | d-pad | arrows | nav |
 | Build / confirm | X | A | Space / Enter | `build` / `buildBase` |
+| Build last picked item (menu closed, empty tile, base built) | X | A | E / U | `build` |
 | Cycle spawn-tower output | hold X over tower | hold A | hold Space | `cycleOutput` |
 | Upgrade | O | B | F | `upgrade` |
 | Recycle | Square | X | X | `recycle` |
@@ -71,8 +72,8 @@ Behaviour:
 
 ## 4. Economy: Thorium, rocks, ship
 
-- Thorium is only obtained from **rocks/meteoroids**, and only through a **Harvester**. Rocks drift across the playfield and land. **No weapon shoots or destroys rocks.** [design change; the original let Turret/Laser/Bomber smash them]
-- The ship **grabs a rock and tows it in front of its nose** (the rock swings round to follow the ship's heading) and drops it inside a Harvester's magnet. [design change]
+- Thorium is only obtained from **rocks/meteoroids**, and only through a **Harvester**. Meteors enter from the map edge and **drift straight across without slowing or landing**. They fly over terrain and structures and are removed once they leave the map (3 tiles past the edge). Rocks placed at map start stay landed. **No weapon shoots or destroys rocks.** [design change; the original let Turret/Laser/Bomber smash them]
+- The ship **grabs a rock and tows it in front of its nose** (the rock swings round to follow the ship's heading) and drops it inside a Harvester's magnet. A dropped rock **keeps the ship's exact velocity with no deceleration** (state `drifting`), so rocks can be thrown at a Harvester from far away. A rock dropped below `ECON.throwRestSpeed` (0.05 t/s) just lands. A moving rock only stops when a Harvester magnet catches it or a ship grabs it, or it is removed when it leaves the map. [design change]
 - Harvester magnet (`ECON.harvesterRange`, by level 0-3): 3 / 4 / 5 / 6.5 tiles. Upgrade cost 60 / 100 / 150. The magnet locks the nearest free rock (drifting or landed, **never one a ship is towing**), pulls it onto the pad at 2.5 tiles/s and drains 5 raw Thorium per second (x `thoriumRate` x map factor) until it is empty. One rock per Harvester at a time; a Harvester destroyed mid-harvest drops its rock. Any player's Harvester takes any free rock in its range. [tuned]
 - Rock Thorium (`ECON.rockThorium`) grows faster than size: small 15 (3 s), medium 40 (8 s), large 75 (15 s). [tuned]
 - Starting rocks per map = `MapDef.rockCount`; new rocks enter from a map-edge hint at an interval driven by `thoriumLevel`. [tuned]
@@ -84,12 +85,21 @@ Behaviour:
 | Medium | 0.7 | 80 | 20 | 30 % |
 | Large | 1.1 | 200 | 50 | 10 % |
 
-- Drift speed 0.25-0.6 tiles/s, random heading, bounce off cliffs; rock spawns every `12 / thoriumLevelMult` seconds per map (`thoriumLevel` 1/2/3 -> mult 0.5/1.0/2.0 matching Battle "50 %..200 %" options). [tuned]
-- When a Harvester empties a rock, it bursts (`rockSmashed`) and its shards fly to the Harvester owner's base. [tuned]
+- Meteor drift speed 0.7-1.6 tiles/s, aimed across the middle of the map. Meteors fly over cliffs and do not bounce off them. A new rock spawns every `12 / thoriumLevelMult` seconds per map (`thoriumLevel` 1/2/3 -> mult 0.5/1.0/2.0 matching Battle "50 %..200 %" options). [tuned]
+- When a Harvester empties a rock, it bursts (`rockSmashed`) and a **money token** flies to the Harvester owner's base. Sometimes a **health token** drops too and flies to the owner's ship, mostly from big rocks: chance by size (`HEALTH_TOKEN_CHANCE`) small 10 %, medium 35 %, large 80 %, rolled on the world RNG. [tuned]
 - Rocks do not block pathing: they drift over structures and units as overlays, but cannot be dragged onto a base. [tuned/guess]
 - Ship drag: while holding a rock the ship accelerates more slowly (bigger rocks slow it more). Max carry 1 rock. Ship physics from config: accel 40 t/s², max 11 t/s, drag 6. [tuned]
 - Start Thorium: per mission `startThorium` x difficulty multiplier (§11). Battle: set by map symbol 1-3 and the Thorium-rate option (50-200 %). [official: options; numbers tuned]
 - Battle bonus: the player who destroys an enemy base gets a Thorium bonus (patch 1.01). [official] Tuned: +250.
+
+### Ship health [design change]
+- Every human and adaptive-AI ship has HP (`src/sim/economy/shipHealth.ts`). Scripted campaign enemies have no ship.
+- **Max HP:** starts at `SHIP_HP_START` 25. Each health token adds `SHIP_HP_PER_TOKEN` +10 (HP too), up to `SHIP_HP_CAP` 100.
+- **Death:** at 0 HP the ship is destroyed. It drops its towed rock, which keeps the ship's velocity, and it loses `SHIP_DEATH_PENALTY` 20 max HP (2 tokens), never going below 25. It respawns after `SHIP_RESPAWN_S` 1.5 s at its own base with full HP (map centre if it has no base). A dead ship is hidden, ignores input and cannot be targeted.
+- **Healing:** while the ship hovers within `SHIP_HEAL_RADIUS` 0.6 tiles of its own base centre, it heals 100 / `SHIP_FULL_HEAL_S` (8 s) HP per second. The base sphere lights up while this happens.
+- **Damage:** enemy weapons shoot ships in range, but only when no unit is in range. Ships count as the air layer: Laser, Pulsar and Bomber can hit them, Turret cannot, and missiles hit both layers. Pulse, bomb, missile and torpedo splash also hurt ships. All weapon damage to ships is scaled by `SHIP_DAMAGE_MULT` 0.4. Allies are never hit.
+- **Kamikaze drones** (Bionic research): see §9.
+- **HP ring:** a ring under the ship shows a light-grey arc for max HP and a darker grey arc for current HP, both out of 100. A new ship starts at a quarter circle and a full circle means max HP. The ring shows on spawn and respawn, on damage and while healing, then fades.
 
 ---
 
@@ -226,6 +236,8 @@ Cross-checks [tuned]:
 ### Special rules summary
 - Torpedo: explodes (splash 0.8 tile, 45 dmg) on first structure within 0.6 tile or at the base. [tuned]
 - Unit death at 0 hp; no healing. [tuned]
+- Visual size: every ground unit is drawn about 0.8 tile across, while air units keep their own size. The sim hit radius is not affected. [tuned]
+- Kamikaze drones (with `kamikaze` research): drones have 1.5x HP. A drone that passes within 0.6 tiles of an enemy ship explodes, dealing 12 damage to the ship and 10 splash damage to enemy units within 0.8 tiles. Drones do not change course to hunt ships. [tuned]
 - Scouting speed advantage: scouts outrun Tank columns, creating separate arrival waves. [tuned]
 
 ---
@@ -234,9 +246,9 @@ Cross-checks [tuned]:
 
 Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**, **Kronos**, 8 areas each, areas 29-44), 10 battle maps in two new environments, new gameplay features, enhanced research upgrades, nuclear silos, behemoth swarm creatures and kamikaze drones. [observed] Trophy guide: Big Snake / Big Dragon trophies need 2-3 players; enemy research tower researches missile silos, silos build missiles, a Pulsar adjacent to a silo destroys it and chain-explodes neighbouring silos; area 41 (Kronos) shortcut opens by destroying key enemy structures. [observed] the user's notes (`pdf fondation general du jeu.pdf`, handwritten French):
 
-- **Spaceship recharging station** ("spawn, base" / player respawn): where the ship respawns/recharges; there is one per base, also acts as player spawn point. [notes] Tuned: if the ship is destroyed/disabled it respawns here after 5 s; carrying a rock drains energy that refills here.
+- **Spaceship recharging station** ("spawn, base" / player respawn): where the ship respawns/recharges; there is one per base, also acts as player spawn point. [notes] Implemented: the base is a 1-tile glowing sphere in the team colour. It is dim when idle and lights fully while its owner launches units, while the owner's ship heals over it, and flashes when hit. A destroyed ship respawns here after 1.5 s, and a ship hovering over it heals (see §4 Ship health).
 - **Harvesting station** ("produces money, player with rock"): the only way to turn rocks into Thorium. Its magnet (3 / 4 / 5 / 6.5 tiles by level) pulls in the nearest free rock and drains it; bigger rocks take longer and pay more (see §4). Available in both rulesets; cost 80.
-- **Research lab** ("unlocks new troop or upgrade"): costs Thorium to research an item in-game, taking `ResearchDef.cost` Thorium; research time 20 s; unlocks units/upgrades in Battle and for the AI. In campaign tech is also granted by areas. Implemented: the lab exists only in the Bionic Swarm ruleset; Bionic battles grant every base-game tech at start and the lab sells the Bionic research (`bionic: true` in `src/data/research.ts`): Snake Swarm `snakeSwarm` 140, Missile Defense `missileDefense` 150, Dragon Swarm `dragonSwarm` 180, Missile Silo `missileSilo` 200 [tuned]. These keys are not part of `ALL_TECH_KEYS` (the base/campaign set).
+- **Research lab** ("unlocks new troop or upgrade"): costs Thorium to research an item in-game, taking `ResearchDef.cost` Thorium; research time 20 s; unlocks units/upgrades in Battle and for the AI. In campaign tech is also granted by areas. Implemented: the lab exists only in the Bionic Swarm ruleset; Bionic battles grant every base-game tech at start and the lab sells the Bionic research (`bionic: true` in `src/data/research.ts`): Snake Swarm `snakeSwarm` 140, Missile Defense `missileDefense` 150, Dragon Swarm `dragonSwarm` 180, Missile Silo `missileSilo` 200, Kamikaze Drones `kamikaze` 160 [tuned]. These keys are not part of `ALL_TECH_KEYS` (the base/campaign set).
 - **Dragon** and **Snake**: super-units. Tuned: *Snake* = ground chain that merges 20 queued ground units into one long armoured ribbon (hp 500, damage on arrival 3 hits); *Dragon* = air equivalent (hp 350, fire breath, 5 hits). Visual snakes in screenshots [observed] are the unit trains themselves.
 - **Missile silo**: builds a long-range missile (build time 25 s, then ready); launch by selecting "missile" in the attack menu; missile travels 4 t/s straight at the target base or structure cluster, deals 3 base hits and a 3-tile splash on structures (100 dmg). Silos are vulnerable and chain-explode (damage 80 in radius 1.5 when destroyed while armed). Counter: **Missile defence system** (cost 100, range 7, hits missiles only, 1 shot/1.5 s, kills a missile in 2 shots) [tuned].
 - **Attack/defence classes** (HUD classification from the notes): **Ground**, **Air**, **Hybrid**, **Bomber**. Mapping used by the code: weapons/units are tagged by class: Ground = hits/is ground only (Turret, Pulsar; scout, tank, hammer...), Air = hits/is air only (Drone, Carrier, Dragon), Hybrid = hits both (Laser), Bomber = area-effect class (Bomber weapon, torpedo, missile). The HUD shows four small class icons next to each weapon/unit card. [tuned mapping of the note]
@@ -252,6 +264,17 @@ Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**,
 - Tech unlock: completing an area unlocks new offensive/defensive towers. Observed order (Fandom campaign snippet): Kreios 1 Tank, Kreios 2 Laser, Kreios 3 Gateways, Kreios 5 Hammers, Hathor 8 Pulsar, Hathor 9 Thief, Hathor 10 Bomber, Aether 15 Drone, Aether 16 Switches, Aether 19 Torpedoes, Aether 20 Carrier, Helios 23 Waypoint. (The snippet also lists a "Resurgence" entry at areas 7/14/21/28 - the numbering of resurgence vs regular areas is ambiguous in the sources; we model 28 regular areas + 4 separate Resurgence maps.) [observed]
 - Players: 1-3 co-op. Difficulty: **Beginner, Casual, Normal (Ranked), Expert** (Expert added in patch 1.03). Only Normal is ranked. [official]
 - Dynamic AI: attack waves adapt to your defence; enemies are released strategically, not on timers. [official]
+- Campaign enemy behaviour [tuned, all campaign areas]:
+  - **Start:** the enemy begins fully set up. Every weapon, defence, spawn tower and swarm reinforcement is placed at t=0, and nothing happens before 30 s. The first wave is at 30 s or later.
+  - **First burst:** at 15 % of par, kept between 40 and 60 s.
+  - **Burst gaps:** start at 90 − 2.5 × aggression s (60-90 s), shrink by 4 s per burst and never drop below 60 s. Bursts stop before the finale.
+  - **Burst order:**
+    1. Upgrade every main weapon at once (e.g. all Lasers).
+    2. Upgrade every spawn tower.
+    3. `rebuildAll`, which restores destroyed preplaced structures on free tiles and never seals a path, followed by upgrading the second weapon kind.
+    4. Each later burst: rebuild, then upgrade the lowest-level defences.
+  - **Actions:** `upgradeAll`, `rebuildAll` and `setOutputAll` grant their own exact Thorium. Nothing eligible means a no-op.
+  - **Level caps:** in base areas they depend on aggression (1-2 → L1, 3-5 → L2, 6+ → L3). In swarm areas they are L2 for areas 1-3 and L3 after that.
 - Scoring: time-based; hits taken apply **time penalties as they occur** (patch 1.01); rank shown on the Area Complete screen; online leaderboards with flags. [official]
 - Trophies: 12 in the base game [official]; one trophy "kill 20 units boxed in with weapons" at Kreios 1 [observed].
 - Save: campaign progress persisted (patch 1.01). Our save key `orbital-clash.save.v1`.
@@ -335,9 +358,9 @@ Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**,
 | 27 | Helios | Heat Sink | multi-lane defence + carrier rushes | 55 | 9 | 560 | 14:00 |
 | 28 | Helios | Sun Core | finale: full toolkit, tough AI | 60 | 9 | 600 | 14:30 |
 
-Ramp rules [tuned]: `startThorium` baseline 300 + 10-20 per area; AI aggression 1->9; enemy hits 5->60; hints available in areas 1-28 (Beginner/Casual always, Normal 1-6 only, Expert none). Each regular area and Resurgence has its own square plateau. Areas 1-40 use the original 30x30 rock layouts in `src/data/areas/grids/NN.txt` (file NN = area NN, `X` = rock, `.` = floor); the human and enemy bases go on the two clear 3x3 pads farthest apart on foot (human nearer the top-left) and co-op pads on the clear spots nearest the human. Areas 41-42 and the Resurgences keep generated plateaus. Enemy scripts: timeline `release` events plus reactive AI.
+Ramp rules [tuned]: `startThorium` baseline 300 + 10-20 per area; AI aggression 1->9; enemy hits 5->60; hints available in areas 1-28 (Beginner/Casual always, Normal 1-6 only, Expert none). Each regular area and Resurgence has its own square plateau. Areas 1-42 use the 30x30 rock layouts in `src/data/areas/grids/NN.txt` (file NN = area NN, `X` = rock, `.` = floor); 1-40 are the original layouts and 41-42 continue their ramp (less floor, fewer clear pads, longer and narrower routes). The human and enemy bases go on the two clear 3x3 pads farthest apart on foot (human nearer the top-left) and co-op pads on the clear spots nearest the human. The Resurgences keep generated plateaus. Enemy scripts: timeline `release` events plus reactive AI.
 
-Highlight any Campaign area, including a locked area or Resurgence, to see its square terrain preview. The briefing keeps that preview visible while you choose difficulty.
+Choose Original or Expansion, 1-4 players and difficulty on the Campaign entry screen, then Continue to the area map. These choices apply throughout the run. Highlight any Campaign area, including a locked area or Resurgence, to see its square terrain preview. The briefing keeps that preview visible before launching the mission.
 
 For playtesting, open the game with `?unlockMaps=1` to launch any Original or Expansion mission from the picker without marking it complete. Remove the query parameter to restore normal access.
 

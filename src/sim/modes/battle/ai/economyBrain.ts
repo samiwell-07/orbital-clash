@@ -84,12 +84,14 @@ export function shipIntents(w: World, me: PlayerId, mem: AiMemory, dt: number): 
   let goal: Goal = home;
 
   if (ship.carrying !== 0) {
-    const s = nearestTo(towers, ship.x, ship.y);
+    // Dropped rocks keep the ship's velocity forever, so only release into a magnet that is free to catch it.
+    const idle = towers.filter((t) => t.targetId === 0);
+    const s = nearestTo(idle.length > 0 ? idle : towers, ship.x, ship.y);
     if (s) {
       goal = centre(s);
       const held = w.rocks.find((r) => r.id === ship.carrying);
       const near = held ? Math.hypot(goal.x - held.x, goal.y - held.y) : Math.hypot(goal.x - ship.x, goal.y - ship.y);
-      if (mem.grabCooldown === 0 && near <= harvesterRange(s.level) * 0.6) {
+      if (mem.grabCooldown === 0 && s.targetId === 0 && near <= harvesterRange(s.level) * 0.6) {
         out.push({ t: 'drop', player: me });
         mem.grabCooldown = SHIP_STEER.repeatSec;
         mem.rockId = 0;

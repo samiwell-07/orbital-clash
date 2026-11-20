@@ -1,7 +1,8 @@
-import type { Emit, PlayerId, ScriptAction, StructureKind, UnitKind, World } from '@/types';
-import { ALL_UNITS } from '@/types';
+import type { Emit, PlayerId, ScriptAction, StructureGroup, StructureKind, UnitKind, World } from '@/types';
+import { ALL_UNITS, WEAPONS } from '@/types';
 import { ALL_TECH_KEYS, SPAWN_TOWER_DEFS, SUPPORT_DEFS, UNIT_DEFS, WEAPON_DEFS, isUnlocked } from '@/data';
 import { addStructure, isTerrainBlocked, occupantAt, structureAt, wouldBlockPath } from '@/sim/core';
+import { HP_PER_LEVEL } from '@/sim/build/info';
 import { campaignState, humanIds } from './state';
 
 /** Launches `count` units already drained from the owner's stored counts (bound to the army-snake API). */
@@ -138,7 +139,11 @@ function aimRelease(w: World, owner: PlayerId): void {
   st.releaseCursor++;
 }
 
-/** Runs one scripted action. Returns an error text (a missing prerequisite) or null. Never skips silently. */
+/**
+ * Runs one scripted action. Returns an error text (a missing prerequisite) or null. Never skips silently,
+ * except the burst actions (upgradeAll, rebuildAll, setOutputAll), which by design act on whatever the
+ * humans left standing and cannot fail on well-formed input.
+ */
 export function executeAction(w: World, owner: PlayerId, a: ScriptAction, ctx: ExecCtx, emit: Emit): string | null {
   const p = w.players[owner];
   if (!p) return `player ${owner} does not exist`;
@@ -168,6 +173,12 @@ export function executeAction(w: World, owner: PlayerId, a: ScriptAction, ctx: E
       return null;
     case 'release':
       return release(w, owner, a, ctx, emit);
+    case 'upgradeAll':
+      return upgradeAll(w, owner, a, emit);
+    case 'rebuildAll':
+      return rebuildAll(w, owner, a, emit);
+    case 'setOutputAll':
+      return setOutputAll(w, owner, a, emit);
     default:
       return upgradeOrOutput(w, owner, a, emit);
   }
@@ -194,5 +205,77 @@ function upgradeOrOutput(
   if (!allowedOutputs(s.kind, s.level).includes(a.output)) return `${where}: output ${a.output} not available at level ${s.level}`;
   if (!isUnlocked(p.tech, UNIT_DEFS[a.output].requires)) return `${where}: output ${a.output} needs tech ${UNIT_DEFS[a.output].requires}`;
   s.output = a.output;
+  return null;
+}
+function inGroup(kind: StructureKind, group: StructureGroup): boolean {
+  if (group === 'weapons') return (WEAPONS as readonly string[]).includes(kind);
+  if (group === 'towers') return kind === 'basicOps' || kind === 'specialOps';
+  return kind === group;
+}
+
+function knownGroup(group: string): boolean {
+  return group === 'weapons' || group === 'towers' || group === 'basicOps' || group === 'specialOps' ||
+    group in WEAPON_DEFS || group in SUPPORT_DEFS;
+}
+
+/** Burst upgrade: self-funded (exact grant first), tolerant of structures the humans destroyed. */
+function upgradeAll(w: World, owner: PlayerId, a: Extract<ScriptAction, { a: 'upgradeAll' }>, emit: Emit): string | null {
+  if (!knownGroup(a.kind)) return `upgradeAll: unknown structure kind "${String(a.kind)}"`;
+  if (a.max !== undefined && (!Number.isInteger(a.max) || a.max < 0)) return `upgradeAll: invalid max ${a.max}`;
+  if (a.cap !== undefined && (!Number.isInteger(a.cap) || a.cap < 0)) return `upgradeAll: invalid cap ${a.cap}`;
+  const cap = a.cap ?? Infinity;
+  const picked = [...w.structures.values()]
+    .filter((s) => s.owner === owner && inGroup(s.kind, a.kind) && s.level < Math.min(cap, structureRules(s.kind).maxLevel))
+    .sort((x, y) => x.level - y.level || x.id - y.id)
+    .slice(0, a.max ?? Infinity);
+  if (picked.length === 0) return null;
+  const p = w.players[owner];
+  const amount = picked.reduce((n, s) => n + structureRules(s.kind).upgradeCost[s.level], 0);
+  if (amount > 0) {
+    p.thorium += amount;
+    emit({ t: 'thorium', owner, amount });
+  }
+  for (const s of picked) {
+    const r = structureRules(s.kind);
+    p.thorium -= r.upgradeCost[s.level];
+    const gain = Math.round(r.hp * (1 + HP_PER_LEVEL * (s.level + 1))) - Math.round(r.hp * (1 + HP_PER_LEVEL * s.level));
+    s.level++;
+    s.maxHp += gain;
+    s.hp += gain;
+    emit({ t: 'structureUpgraded', id: s.id, level: s.level });
+  }
+  if (a.text) emit({ t: 'message', text: a.text, owner });
+  return null;
+}
+
+/** Burst rebuild: free re-placement of the owner's original structures on tiles that are free and safe again. */
+function rebuildAll(w: World, owner: PlayerId, a: Extract<ScriptAction, { a: 'rebuildAll' }>, emit: Emit): string | null {
+  const originals = (w.settings.mission?.preplaced ?? []).filter((s) => s.owner === owner);
+  let rebuilt = 0;
+  for (const s of originals) {
+    if (isTerrainBlocked(w.grid, s.tx, s.ty) || occupantAt(w.grid, s.tx, s.ty) !== 0) continue;
+    if (w.players.some((q) => q.baseBuilt && q.baseTx === s.tx && q.baseTy === s.ty)) continue;
+    if (w.units.some((u) => u.state !== 'dead' && u.layer === 'ground' && Math.floor(u.x) === s.tx && Math.floor(u.y) === s.ty)) continue;
+    if (wouldBlockPath(w, s.tx, s.ty, owner)) continue;
+    // placeStructure re-checks every human base path; a refusal there is a silent skip, not an error.
+    if (placeStructure(w, owner, s, { strict: false }, emit) === null) rebuilt++;
+  }
+  if (rebuilt > 0 && a.text) emit({ t: 'message', text: a.text, owner });
+  return null;
+}
+
+function setOutputAll(w: World, owner: PlayerId, a: Extract<ScriptAction, { a: 'setOutputAll' }>, emit: Emit): string | null {
+  if (a.kind !== 'basicOps' && a.kind !== 'specialOps') return `setOutputAll: ${String(a.kind)} has no output`;
+  if (!UNIT_DEFS[a.output]) return `setOutputAll: unknown unit "${String(a.output)}"`;
+  const p = w.players[owner];
+  if (!isUnlocked(p.tech, UNIT_DEFS[a.output].requires)) return `setOutputAll: output ${a.output} needs tech ${UNIT_DEFS[a.output].requires}`;
+  let changed = 0;
+  for (const s of w.structures.values()) {
+    if (s.owner !== owner || s.kind !== a.kind || s.output === a.output) continue;
+    if (!allowedOutputs(s.kind, s.level).includes(a.output)) continue;
+    s.output = a.output;
+    changed++;
+  }
+  if (changed > 0 && a.text) emit({ t: 'message', text: a.text, owner });
   return null;
 }

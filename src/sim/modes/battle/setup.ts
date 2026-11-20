@@ -1,6 +1,6 @@
 import type { Difficulty, NewGameOptions, PlayerId, PlayerSlot } from '@/types';
 import { PLAYER_IDS } from '@/types';
-import { DEFAULT_HITS, MAX_HITS, MIN_HITS } from '@/config/constants';
+import { DEFAULT_HITS, MAX_HITS, MAX_PLAYERS, MIN_HITS } from '@/config/constants';
 import { findMap, registerMap } from '@/sim/core/defaultMap';
 import { battleMapById } from '@/data/battle-maps';
 import { BATTLE_CONFIG, clampStrength } from './config';
@@ -65,7 +65,7 @@ export function validateBattleSetup(s: BattleSetup): string[] {
   if (s.players.length > max) errors.push(`at most ${max} players are allowed (got ${s.players.length})`);
   const ids = new Set<number>();
   for (const p of s.players) {
-    if (!PLAYER_IDS.includes(p.id)) errors.push(`invalid player id ${String(p.id)}`);
+    if (!PLAYER_IDS.includes(p.id) || p.id >= MAX_PLAYERS) errors.push(`invalid player id ${String(p.id)}`);
     else if (ids.has(p.id)) errors.push(`duplicate player id ${p.id}`);
     ids.add(p.id);
     if (!Number.isInteger(p.team)) errors.push(`player ${p.id}: team must be an integer`);

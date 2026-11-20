@@ -50,6 +50,15 @@ export class WorldEnv implements RouteEnv {
     return true;
   }
 
+  shipPos(owner: number, out: Pos): boolean {
+    const p = this.world?.players[owner];
+    if (!p) return false;
+    if (p.ship.dead) return this.basePos(owner, out);
+    out.x = p.ship.x;
+    out.y = p.ship.y;
+    return true;
+  }
+
   hitsFrac(owner: number): number {
     const p = this.world?.players[owner];
     if (!p || p.maxHits <= 0) return 1;

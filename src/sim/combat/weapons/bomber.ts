@@ -14,7 +14,7 @@ export function fire(w: World, s: Structure, target: Target, level: number, emit
   addProjectile(w, {
     owner: s.owner, kind: 'bomb', x, y, z: 0.5,
     vx: (dx / dist) * BOMB_SPEED, vy: (dy / dist) * BOMB_SPEED,
-    damage: def.damage[level], splash: def.splash, targetId: target.id,
+    damage: def.damage[level], splash: def.splash, targetId: target.id, targetShip: target.ship,
     life: dist / BOMB_SPEED + SHOT_SLACK, layerMask: def.targets,
   });
   emit({ t: 'shot', from: s.id, kind: s.kind, x, y, tx: target.x, ty: target.y });

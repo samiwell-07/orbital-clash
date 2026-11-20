@@ -84,7 +84,9 @@ export function drawNode(ctx: Ctx, n: NodeView, now: number): void {
   ctx.strokeStyle = n.locked ? '#3a3f4d' : n.selected ? '#fff' : col;
   ctx.stroke();
   ctx.restore();
-  if (n.locked) drawIcon(ctx, 'lock', n.x, n.y, 26, COLORS.lock);
-  else glowText(ctx, n.label, n.x, n.y + 1, { size: n.selected ? 30 : 24, color: '#fff', glow: col, align: 'center', weight: 700 });
+  if (n.locked) {
+    drawText(ctx, n.label, n.x, n.y + 1, { size: n.selected ? 30 : 24, color: COLORS.dim, align: 'center', weight: 700 });
+    drawIcon(ctx, 'lock', n.x, n.y + r + 14, 16, COLORS.lock);
+  } else glowText(ctx, n.label, n.x, n.y + 1, { size: n.selected ? 30 : 24, color: '#fff', glow: col, align: 'center', weight: 700 });
   if (n.rank) drawText(ctx, n.rank, n.x, n.y + r + 18, { size: 18, color: COLORS.thorium, align: 'center', weight: 700 });
 }

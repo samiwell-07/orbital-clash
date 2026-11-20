@@ -27,7 +27,7 @@ void main() {
   float d = max(p.x, p.y);
   float edge = smoothstep(0.07, 0.0, abs(d - half_));
   float corner = edge * step(0.5, min(p.x, p.y));
-  float fill = step(d, half_) * 0.1;
+  float fill = step(d, half_) * (0.2 + 0.04 * sin(uTime * 3.0)) * (1.0 - 0.3 * d);
   float pulse = 1.4 + 0.5 * sin(uTime * 5.0);
   float a = clamp(edge * 0.4 + corner * 0.8 + fill, 0.0, 1.0);
   gl_FragColor = vec4(uColor * pulse, a);

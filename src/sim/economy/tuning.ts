@@ -7,11 +7,8 @@ export const ECON = {
   rockThorium: { 1: 15, 2: 40, 3: 75 } as const,
   /** Multiplier on harvest payout by map thorium level 1..3. */
   levelFactor: { 1: 0.8, 2: 1, 3: 1.25 } as const,
+  /** Meteoroid speed range (tiles/s); they never slow or land, so they cross the map and leave it. */
   meteorSpeed: [0.7, 1.6] as const,
-  /** Chance per second that an on-map drifting rock comes to rest. */
-  landPerSecond: 0.12,
-  /** Distance inside the edge where rocks may land. */
-  landMargin: 3,
   grabRange: 1.5,
   /** Ship acceleration divisor grows with the carried rock's size. */
   carrySlowPerSize: 0.12,
@@ -21,6 +18,8 @@ export const ECON = {
   towTurnRate: 9,
   /** Ship speed (tiles/s) above which its heading updates. */
   towHeadingMinSpeed: 0.4,
+  /** A dropped rock keeps its ship's velocity forever; below this speed (tiles/s) it lands where dropped instead. */
+  throwRestSpeed: 0.05,
   shipMargin: 0.5,
   /** Harvester magnet radius in tiles by level 0..3. Carried rocks are ignored: drop them inside it. */
   harvesterRange: [3, 4, 5, 6.5] as const,

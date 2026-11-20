@@ -54,3 +54,13 @@ export function drawBuildMenu(
     drawText(ctx, msg, r.x + r.w / 2, r.y + r.h + 18 * s, { size: 13 * s, color: cur.lockReason ? COLORS.lock : COLORS.danger, align: 'center', weight: 600 });
   }
 }
+
+/** Menu closed, empty cursor tile: small "build here" hint showing the last picked item (A / Cross quick-builds it). */
+export function drawQuickBuildHint(ctx: Ctx, at: { x: number; y: number }, item: BuildItem, player: number, s: number): void {
+  const col = item.locked ? COLORS.dim : playerColor(player);
+  ctx.save();
+  ctx.globalAlpha = item.locked ? 0.45 : item.affordable ? 0.8 : 0.5;
+  drawIcon(ctx, item.kind, at.x + 10 * s, at.y, 16 * s, col);
+  drawText(ctx, item.name, at.x + 22 * s, at.y, { size: 12 * s, color: COLORS.text, weight: 600 });
+  ctx.restore();
+}

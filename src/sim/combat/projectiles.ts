@@ -1,7 +1,9 @@
-import type { Emit, Projectile, System, Unit, World } from '@/types';
+import type { Emit, PlayerId, Projectile, System, Unit, World } from '@/types';
 import { hitBase } from '@/sim/core';
 import { UNIT_DEFS } from '@/data';
-import { damageUnit, splashStructures, splashUnits } from './damage';
+import { SHIP_DAMAGE_MULT, SHIP_HIT_RADIUS } from '@/config/constants';
+import { damageShip, shipTargetable } from '@/sim/economy/shipHealth';
+import { damageUnit, splashShips, splashStructures, splashUnits } from './damage';
 import { hostile, unitIndex } from './targeting';
 import { IMPACT_FUSE, MISSILE_BASE_HITS, SHOT_FUSE, TORPEDO_BASE_HITS } from './tuning';
 
@@ -10,20 +12,27 @@ interface Loc {
   y: number;
   radius: number;
   unit: Unit | null;
+  ship: PlayerId | -1;
 }
-const loc: Loc = { x: 0, y: 0, radius: 0, unit: null };
+const loc: Loc = { x: 0, y: 0, radius: 0, unit: null, ship: -1 };
 
 /** Where a shot's target currently is, or null when it is gone. */
 function locate(w: World, p: Projectile, index: Map<number, Unit>): Loc | null {
+  if (p.targetShip !== -1) {
+    const pl = w.players[p.targetShip];
+    if (!shipTargetable(pl)) return null;
+    loc.x = pl.ship.x; loc.y = pl.ship.y; loc.radius = SHIP_HIT_RADIUS; loc.unit = null; loc.ship = pl.id;
+    return loc;
+  }
   if (p.targetId === 0) return null;
   const u = index.get(p.targetId);
   if (u && u.state !== 'dead') {
-    loc.x = u.x; loc.y = u.y; loc.radius = UNIT_DEFS[u.kind].radius; loc.unit = u;
+    loc.x = u.x; loc.y = u.y; loc.radius = UNIT_DEFS[u.kind].radius; loc.unit = u; loc.ship = -1;
     return loc;
   }
   const s = w.structures.get(p.targetId);
   if (s) {
-    loc.x = s.tx + 0.5; loc.y = s.ty + 0.5; loc.radius = 0.5; loc.unit = null;
+    loc.x = s.tx + 0.5; loc.y = s.ty + 0.5; loc.radius = 0.5; loc.unit = null; loc.ship = -1;
     return loc;
   }
   return null;
@@ -42,6 +51,7 @@ function aim(p: Projectile, tx: number, ty: number): void {
 function stepBullet(w: World, p: Projectile, emit: Emit, t: Loc | null): boolean {
   if (t && Math.hypot(t.x - p.x, t.y - p.y) <= t.radius + 0.15) {
     if (t.unit) damageUnit(w, t.unit, p.damage, p.owner, emit);
+    else if (t.ship !== -1) damageShip(w, t.ship, p.damage * SHIP_DAMAGE_MULT, p.owner, emit);
     return false;
   }
   return p.life > 0;
@@ -50,6 +60,7 @@ function stepBullet(w: World, p: Projectile, emit: Emit, t: Loc | null): boolean
 function detonateSplash(w: World, p: Projectile, emit: Emit): void {
   const radius = p.splash > 0 ? p.splash : 0.5;
   splashUnits(w, p.x, p.y, radius, p.damage, p.owner, p.layerMask, emit);
+  splashShips(w, p.x, p.y, radius, p.damage, p.owner, p.layerMask, emit);
   emit({ t: 'explosion', x: p.x, y: p.y, radius, big: false });
 }
 
@@ -75,7 +86,7 @@ function structureInFuse(w: World, p: Projectile): boolean {
   return false;
 }
 
-function baseInFuse(w: World, p: Projectile): number {
+function baseInFuse(w: World, p: Projectile): PlayerId | -1 {
   for (const pl of w.players) {
     if (!pl.alive || !pl.baseBuilt || !hostile(w, p.owner, pl.id)) continue;
     if (Math.hypot(pl.baseTx + 0.5 - p.x, pl.baseTy + 0.5 - p.y) <= IMPACT_FUSE) return pl.id;
@@ -87,10 +98,11 @@ function baseInFuse(w: World, p: Projectile): number {
 function stepImpact(w: World, p: Projectile, emit: Emit): boolean {
   const base = baseInFuse(w, p);
   if (base === -1 && p.life > 0 && !structureInFuse(w, p)) return true;
-  if (base !== -1) hitBase(w, base as 0 | 1 | 2 | 3, p.owner, emit, p.kind === 'missile' ? MISSILE_BASE_HITS : TORPEDO_BASE_HITS);
+  if (base !== -1) hitBase(w, base, p.owner, emit, p.kind === 'missile' ? MISSILE_BASE_HITS : TORPEDO_BASE_HITS);
   const radius = p.splash > 0 ? p.splash : 1;
   splashStructures(w, p.x, p.y, radius, p.damage, p.owner, emit);
   splashUnits(w, p.x, p.y, radius, p.damage, p.owner, 'both', emit);
+  splashShips(w, p.x, p.y, radius, p.damage, p.owner, 'both', emit);
   emit({ t: 'explosion', x: p.x, y: p.y, radius, big: true });
   return false;
 }

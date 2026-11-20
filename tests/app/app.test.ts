@@ -6,7 +6,7 @@ import { battleOutcome, finishRun } from '@/app/runEnd';
 import { newSave } from '@/meta';
 import { resolvePaletteId } from '@/render/terrain/palettes';
 import { createKeyboard } from '@/input/keyboard';
-import type { PlayerId } from '@/types';
+import type { PlayerId, Seat } from '@/types';
 
 registerAllSystems();
 
@@ -37,6 +37,32 @@ describe('app glue', () => {
     const session = createSession(spec);
     expect(session.sim.world.players.slice(0, 2).map((p) => p.colorIndex)).toEqual([6, 1]);
     session.dispose();
+  });
+  it('routes the fourth campaign controller independently and records a four-player victory', () => {
+    const seats: Seat[] = (['pad0', 'pad1', 'pad2', 'pad3'] as const).map((device, i) => ({ device, colorIndex: i + 2 }));
+    const pads = seats.map(() => ({
+      connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+    }));
+    const spec = buildRun({ t: 'startCampaign', cometId: 'gaia', index: 0, resurgence: false, difficulty: 'expert', seats });
+    if (typeof spec === 'string') throw new Error(spec);
+    const session = createSession(spec, { getGamepads: () => pads, keyboard: createKeyboard(null) });
+    try {
+      const world = session.sim.world;
+      const starts = spec.humans.map(id => world.players[id].ship.x);
+      pads[3].axes[0] = 1;
+      for (let i = 0; i < 10; i++) session.frame(1 / 60);
+      expect(spec.humans.slice(0, 3).map(id => world.players[id].ship.x)).toEqual(starts.slice(0, 3));
+      expect(world.players[4].ship.x).toBeGreaterThan(starts[3]);
+      expect(world.players[4].colorIndex).toBe(seats[3].colorIndex);
+      world.players[1].hits = world.players[1].maxHits;
+      session.sim.step([]);
+      expect(session.sim.drainEvents().filter(e => e.t === 'missionError')).toEqual([]);
+      const result = finishRun(session, newSave());
+      expect(result.save.lastPlayed).toMatchObject({ difficulty: 'expert', coopPlayers: 4 });
+      expect(nextAreaCommand(spec.command, result.save)).toEqual({ ...spec.command, index: 1 });
+    } finally {
+      session.dispose();
+    }
   });
 
   it('launches and scores the expansion with its own worlds, including both Resurgences', () => {

@@ -1,6 +1,7 @@
 import type { Emit, Player, PlayerId, System, UnitKind, World } from '@/types';
 import { UNIT_DEFS } from '@/data';
 import { addUnit } from '@/sim/core';
+import { launchHp } from '@/sim/units/tuning';
 import { AIR_HEIGHT, RELEASE_RATE } from './constants';
 import { storedOf, takeStored } from './storage';
 import { attachUnit, createTrain, spacingFor, type Link } from './train';
@@ -15,7 +16,7 @@ const states = new WeakMap<World, Release>();
 function stateFor(w: World): Release {
   let s = states.get(w);
   if (!s) {
-    s = { acc: [0, 0, 0, 0], tail: [null, null, null, null] };
+    s = { acc: w.players.map(() => 0), tail: w.players.map(() => null) };
     states.set(w, s);
   }
   return s;
@@ -30,8 +31,8 @@ function validTarget(w: World, p: Player, t: PlayerId): boolean {
 export function resolveTarget(w: World, p: Player): PlayerId | -1 {
   const cur = p.attack.targetPlayer;
   if (validTarget(w, p, cur)) return cur;
-  for (let i = 1; i <= 4; i++) {
-    const t = ((cur + i) % 4) as PlayerId;
+  for (let i = 1; i <= w.players.length; i++) {
+    const t = w.players[(cur + i) % w.players.length].id;
     if (validTarget(w, p, t)) {
       p.attack.targetPlayer = t;
       return t;
@@ -46,10 +47,11 @@ function launchOne(w: World, p: Player, kind: UnitKind, target: PlayerId, tail: 
   takeStored(p, kind, 1);
   const x = p.baseTx + 0.5;
   const y = p.baseTy + 0.5;
+  const hp = launchHp(p.tech, kind);
   const unit = addUnit(w, {
     kind, owner: p.id, targetPlayer: target, x, y,
     z: def.layer === 'air' ? AIR_HEIGHT : 0,
-    hp: def.hp, maxHp: def.hp, layer: def.layer,
+    hp, maxHp: hp, layer: def.layer,
     trainIndex: tail ? tail.unit.trainIndex + 1 : 0,
   });
   p.stats.unitsLaunched++;

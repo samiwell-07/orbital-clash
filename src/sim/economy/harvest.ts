@@ -1,6 +1,9 @@
-import type { Emit, Rock, Structure, System, World } from '@/types';
+import type { Emit, PlayerId, Rock, Structure, System, World } from '@/types';
+import { HEALTH_TOKEN_CHANCE, SHIP_HP_PER_TOKEN } from '@/config/constants';
+import { rand } from '@/sim/core';
 import { addThorium } from './thorium';
 import { mapThoriumFactor } from './meteors';
+import { applyHealthToken, hasShip } from './shipHealth';
 import { ECON } from './tuning';
 
 /** Magnet radius (tiles) of a harvester at the given upgrade level. */
@@ -41,7 +44,18 @@ function drain(w: World, s: Structure, r: Rock, emit: Emit): void {
   if (r.thorium > 0) return;
   r.state = 'smashed';
   s.targetId = 0;
-  emit({ t: 'rockSmashed', id: r.id, x: r.x, y: r.y, thorium: payout(w, ECON.rockThorium[r.size]), owner: s.owner });
+  const total = payout(w, ECON.rockThorium[r.size]);
+  emit({ t: 'rockSmashed', id: r.id, x: r.x, y: r.y, thorium: total, owner: s.owner });
+  dropTokens(w, s.owner, r, total, emit);
+}
+
+/** Pickup visuals for a full harvest (the thorium itself was already paid per pulse), plus a chance at a health token. */
+function dropTokens(w: World, owner: PlayerId, r: Rock, money: number, emit: Emit): void {
+  emit({ t: 'token', kind: 'money', owner, x: r.x, y: r.y, amount: money });
+  if (!hasShip(w.players[owner])) return;
+  if (rand(w) >= HEALTH_TOKEN_CHANCE[r.size]) return;
+  applyHealthToken(w, owner);
+  emit({ t: 'token', kind: 'health', owner, x: r.x, y: r.y, amount: SHIP_HP_PER_TOKEN });
 }
 
 /**

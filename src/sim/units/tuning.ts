@@ -1,5 +1,5 @@
 // Special-unit tuning. Base unit stats (hp, speed, structureDamage) live in src/data/units.ts.
-import type { UnitKind } from '@/types';
+import type { Tech, UnitKind } from '@/types';
 import { UNIT_DEFS } from '@/data';
 
 export interface ContactSpec {
@@ -39,3 +39,15 @@ export const THIEF_LOOT = 40;
 
 export const CARRIER_CAP = 20;
 export const CARGO_KIND: UnitKind = 'scout';
+
+/**
+ * Kamikaze Drones (Bionic research): drones get extra hp, and a drone passing within `reach` of a live enemy
+ * ship dives into it: `damage` to the ship (raw, not weapon-scaled), `splash` damage to enemy units around it.
+ */
+export const KAMIKAZE = { key: 'kamikaze', hpMult: 1.5, reach: 0.6, damage: 12, splashRadius: 0.8, splash: 10 } as const;
+
+/** Launch hp of a unit for its owner's tech (Kamikaze Drones toughen drones). */
+export function launchHp(tech: Tech, kind: UnitKind): number {
+  const hp = UNIT_DEFS[kind].hp;
+  return kind === 'drone' && tech[KAMIKAZE.key] === true ? Math.round(hp * KAMIKAZE.hpMult) : hp;
+}

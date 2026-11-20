@@ -5,11 +5,12 @@ import { getArrivalHook, getUnitBehavior } from '@/sim/army/hooks';
 import { registerUnitBehaviors } from '@/sim/units';
 import { hammerBehavior } from '@/sim/units/hammer';
 import { switchBehavior } from '@/sim/units/switch';
-import { torpedoBehavior, tankBehavior } from '@/sim/units/basic';
+import { droneBehavior, torpedoBehavior, tankBehavior } from '@/sim/units/basic';
 import { carrierArrival } from '@/sim/units/carrier';
 import { damageUnit } from '@/sim/combat';
 import { arena, emitter, putStructure, putUnit, putWeapon, runCombat } from './helpers';
-import { SWITCH_STUN, THIEF_LOOT } from '@/sim/units/tuning';
+import { KAMIKAZE, launchHp, SWITCH_STUN, THIEF_LOOT } from '@/sim/units/tuning';
+import { UNIT_DEFS } from '@/data';
 
 beforeAll(() => registerUnitBehaviors());
 
@@ -133,5 +134,36 @@ describe('unit behaviours', () => {
     c2.aux = 4;
     damageUnit(w, c2, 50, 1, emitter(w));
     expect(w.units.filter((u) => u.kind === 'scout' && u.owner === 0)).toHaveLength(10);
+  });
+});
+
+describe('kamikaze drones', () => {
+  it('with the research a drone dives into an enemy ship it passes and explodes; without it, it flies on', () => {
+    const w = arena();
+    const ship = w.players[1].ship;
+    ship.x = 5.8;
+    ship.y = 4.5;
+    const plain = putUnit(w, 'drone', 0, 5.5, 4.5);
+    expect(droneBehavior(w, plain, TICK_DT, emitter(w))).toBe(false);
+    expect(ship.hp).toBe(ship.maxHp);
+    w.players[0].tech[KAMIKAZE.key] = true;
+    const escort = putUnit(w, 'scout', 1, 5.6, 4.5);
+    expect(droneBehavior(w, plain, TICK_DT, emitter(w))).toBe(true);
+    expect(plain.state).toBe('dead');
+    expect(ship.hp).toBe(ship.maxHp - KAMIKAZE.damage);
+    expect(escort.hp).toBeLessThan(escort.maxHp);
+    expect(w.events).toContainEqual(expect.objectContaining({ t: 'shipHit', owner: 1, attacker: 0 }));
+  });
+
+  it('leaves allied ships alone and toughens launched drones', () => {
+    const w = arena(true);
+    w.players[0].tech[KAMIKAZE.key] = true;
+    w.players[1].ship.x = 5.5;
+    w.players[1].ship.y = 4.5;
+    const d = putUnit(w, 'drone', 0, 5.5, 4.5);
+    expect(droneBehavior(w, d, TICK_DT, emitter(w))).toBe(false);
+    expect(launchHp({ kamikaze: true }, 'drone')).toBeGreaterThan(UNIT_DEFS.drone.hp);
+    expect(launchHp({}, 'drone')).toBe(UNIT_DEFS.drone.hp);
+    expect(launchHp({ kamikaze: true }, 'tank')).toBe(UNIT_DEFS.tank.hp);
   });
 });

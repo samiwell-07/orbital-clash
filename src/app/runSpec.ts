@@ -4,6 +4,7 @@ import { startCampaign, HUMAN_SLOT_IDS } from '@/sim/modes/campaign';
 import { startBattle } from '@/sim/modes/battle';
 import { AREAS_PER_COMET, EXPANSION_ORDER, isCometUnlocked, type SaveData } from '@/meta';
 import type { BattleConfig, Command } from '@/ui';
+import { MAX_COOP_PLAYERS } from '@/config/constants';
 
 export type StartCommand = Extract<Command, { t: 'startCampaign' | 'startBattle' }>;
 
@@ -48,7 +49,7 @@ export function buildRun(cmd: StartCommand, difficulty: Difficulty = 'normal', s
   if (cmd.t === 'startCampaign') {
     const mission = getMission(cmd.cometId, cmd.index, cmd.resurgence);
     if (!mission) return `Unknown area ${cmd.cometId} ${cmd.index}`;
-    const coop = Math.min(3, Math.max(1, cmd.seats.length));
+    const coop = Math.min(MAX_COOP_PLAYERS, Math.max(1, cmd.seats.length));
     const options = startCampaign({
       mission, difficulty: cmd.difficulty, humanPlayers: coop, humanColors: cmd.seats.map((s) => s.colorIndex), seed: 1000 + mission.index,
     });

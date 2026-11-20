@@ -18,7 +18,9 @@ describe('build menu data', () => {
     const world = fakeWorld([fakePlayer(0, { thorium: 55, tech: { laser: false } })]);
     const items = buildItemsFor(world, 0);
     expect(items.map((i) => i.kind)).toEqual(buildKindsFor(world));
-    expect(items.slice(0, 4).map((i) => i.kind)).toEqual(['turret', 'laser', 'pulsar', 'bomber']);
+    const kinds = items.map((i) => i.kind);
+    expect(kinds[0]).toBe('harvester');
+    expect(kinds.slice(kinds.indexOf('turret'), kinds.indexOf('turret') + 4)).toEqual(['turret', 'laser', 'pulsar', 'bomber']);
     const laser = items.find((i) => i.kind === 'laser');
     expect(laser?.locked).toBe(true);
     expect(laser?.lockReason).toBe('Requires Lasers');

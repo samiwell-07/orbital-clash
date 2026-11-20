@@ -18,6 +18,11 @@ const X_AXIS = new Vector3(1, 0, 0);
 const RING_SEGS = 64;
 const RING_HOLD_S = 1.5;
 const RING_FADE_S = 0.4;
+
+/** Active players fly a ship; the scripted campaign enemy has none. */
+export function hasShipModel(p: Pick<Player, 'controller' | 'alive'>): boolean {
+  return p.alive && (p.controller === 'human' || p.controller === 'adaptive');
+}
 const RING_Y = -0.12;
 
 const hullGeometry = (): BufferGeometry => assemble([
@@ -120,7 +125,7 @@ export class ShipSystem implements ModelSystem {
     const alpha = clamp01(f.alpha);
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
-      const live = p.controller !== 'none' && p.alive;
+      const live = hasShipModel(p);
       let v = this.views[i];
       if (!live) {
         if (v) { v.root.visible = false; v.beam.visible = false; }

@@ -27,7 +27,8 @@ export interface Structure {
   scripted: boolean;
 }
 
-export type UnitState = 'marching' | 'attacking' | 'dead';
+/** 'guarding': idle campaign garrison troop standing in its territory until a scripted release sends it. */
+export type UnitState = 'marching' | 'attacking' | 'guarding' | 'dead';
 
 export interface Unit {
   id: EntityId;

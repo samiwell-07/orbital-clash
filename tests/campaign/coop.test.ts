@@ -104,6 +104,8 @@ describe('campaign co-op bases', () => {
   it('spreads scripted releases across the living human bases', () => {
     const w = createWorld(startCampaign({ mission: kreios2, difficulty: 'normal', humanPlayers: 4 }));
     applyMissionSetup(w, () => undefined);
+    // Without its garrison every release comes out of the base, through the handler.
+    w.units.length = 0;
     const aimed: PlayerId[] = [];
     setReleaseHandler((world, owner) => { aimed.push(world.players[owner].attack.targetPlayer); });
     try {

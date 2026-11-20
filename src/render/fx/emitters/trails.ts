@@ -24,7 +24,7 @@ export function createTrailSampler() {
       for (let k = 0; k < visit; k++) {
         const u = units[cursor];
         cursor = cursor + 1 === n ? 0 : cursor + 1;
-        if (u.state === 'dead') continue;
+        if (u.state === 'dead' || u.state === 'guarding') continue;
         const col = playerColor(u.owner);
         const dx = Math.cos(u.heading);
         const dz = Math.sin(u.heading);

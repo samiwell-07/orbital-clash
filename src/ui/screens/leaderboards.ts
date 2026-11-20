@@ -1,6 +1,6 @@
 import type { CometId, Difficulty } from '../../types';
 import { boardKey, getBoard, LEADERBOARD_SIZE } from '../../meta/leaderboard';
-import { COMET_ORDER, AREAS_PER_COMET } from '../../meta/saveSchema';
+import { COMET_ORDER, EXPANSION_ORDER, AREAS_PER_COMET } from '../../meta/saveSchema';
 import { COLORS, drawText, rgba } from '../theme';
 import { formatTime, humanize } from '../format';
 import { Form, type Row } from '../menus/form';
@@ -11,15 +11,16 @@ import { DIFFICULTY_LABELS, DIFFICULTY_ORDER } from './settings';
 import type { Screen } from './types';
 
 const AREA_OPTIONS = [...Array.from({ length: AREAS_PER_COMET }, (_, i) => `Area ${i + 1}`), 'Resurgence'];
+const COMETS = [...COMET_ORDER, ...EXPANSION_ORDER];
 
 export function leaderboardKeyFor(comet: number, area: number, diff: number): string {
-  const id = COMET_ORDER[comet] as CometId;
+  const id = COMETS[comet] as CometId;
   const resurgence = area >= AREAS_PER_COMET;
   return boardKey(id, resurgence ? 0 : area, DIFFICULTY_ORDER[diff] as Difficulty, resurgence);
 }
 
 const rows = (): Row[] => [
-  { k: 'choice', id: 'comet', label: 'Comet', options: COMET_ORDER.map(humanize), index: 0 },
+  { k: 'choice', id: 'comet', label: 'Comet', options: COMETS.map(humanize), index: 0 },
   { k: 'choice', id: 'area', label: 'Area', options: AREA_OPTIONS, index: 0 },
   { k: 'choice', id: 'diff', label: 'Difficulty', options: DIFFICULTY_LABELS, index: 2 },
 ];

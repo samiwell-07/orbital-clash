@@ -17,7 +17,7 @@ npm test
 - **Defense**: Turret, Laser, Pulsar, Bomber. Upgrade (corner marks, platform grows at max), recycle (value drops with damage), repair.
 - **Offense**: Basic Ops spawn towers (Scout, Tank, Drone, Torpedo; hold A / Cross to switch output), Special Ops / Hammer towers (Hammer, Switch, Thief, Carrier). Units teleport to your base (cap 1000) and are released with the right stick as long single-file trains that follow the enemy's maze.
 - **Economy**: meteoroids drop Thorium rocks; grab one with your ship (it rides in front of the nose) and drop it inside a Harvester's magnet. The Harvester drains it: bigger rocks take longer but pay more. Upgrading a Harvester widens its magnet.
-- **Campaign**: 4 comets (Kreios, Hathor, Aether, Helios) x 7 areas plus a Resurgence area each, 4 difficulties, 1–3 player co-op. Enemies are **scripted** by mission timelines.
+- **Campaign**: Kreios, Hathor, Aether and Helios cover Areas 1–28. The independent Bionic Swarm campaign starts on Gaia (29–35); clearing Gaia unlocks Kronos (36–42). Each comet has a Resurgence mission after its seven numbered areas. Both campaigns support four difficulties and 1–3 player co-op, with enemies scripted by mission timelines.
 - **Battle**: 1–4 players, teams, Max Hits 1–100, per-player strength, timed mode (8x spawn at zero), Thorium rate 50–200 %, 16 maps, adaptive AI opponents.
 - Save data, local leaderboards with flags, 12 trophies, 16:9 and 4:3 layouts.
 
@@ -55,8 +55,8 @@ Before every campaign mission (Launch Mission) and every battle (Start), a lobby
 Online play needs the dev server, which runs a small relay at `/net` and listens on the local network (the single-file build has no relay).
 
 1. On the host laptop, run `npm run dev` from `game/`. Vite prints a `Network:` address such as `http://192.168.1.23:5173/`. If Windows Firewall asks, allow Node.js on **private** networks.
-2. Open the Campaign or Battle lobby as usual and press **Y / Triangle** (keyboard **R**) to host. The lobby shows a 4-digit room code and the address friends should open.
-3. Each friend opens that address in their own browser, chooses **Join Online** on the title screen, and enters the code: type the digits, or use the D-pad to change a digit (▲▼) and move between digits (◀▶). Then press **A / Cross** or Enter.
+2. On the title screen choose **Multiplayer**, then **Create Battle Lobby** (set up the battle, then Start) or **Create Co-op Lobby** (pick a campaign area, then Launch Mission). The lobby goes online right away and shows a 4-digit room code and the address friends should open. You can also turn any local Campaign or Battle lobby online by pressing **Y / Triangle** (keyboard **R**).
+3. Each friend opens that address in their own browser, chooses **Multiplayer → Join Lobby**, and enters the code: type the digits, or use the D-pad to change a digit (▲▼) and move between digits (◀▶). Then press **A / Cross** or Enter.
 4. Friends join seats with their own controllers or keyboards, just like the local lobby. A machine can have more than one player. When everyone is ready, the host's countdown starts the match on every machine.
 
 - Every machine runs the same simulation in lockstep, so a slow connection makes the game wait (the banner reads "Waiting for P2…") rather than drift apart. A periodic check shows "Out of sync" if the machines ever disagree. Use the same browser engine on every machine (for example Chrome or Edge everywhere).
@@ -74,7 +74,7 @@ src/
   sim/build economy     construction rules, rocks, thorium, ship
   sim/army combat units spawn towers, snake trains, weapons, unit behaviours
   sim/modes             campaign (scripted timeline) and battle (+ adaptive AI)
-  data/                 unit/weapon/research defs, 32 campaign areas, 16 battle maps
+  data/                 unit/weapon/research defs, 48 campaign missions, 16 battle maps
   input/ audio/ meta/   gamepad+keyboard, synthesized sound, save/leaderboard/trophies
   render/ ui/ app/      three.js engine+terrain+models+fx, canvas HUD+menus, shell
 docs/                   architecture, style guide, mechanics notes

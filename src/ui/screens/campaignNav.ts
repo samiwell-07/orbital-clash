@@ -1,5 +1,5 @@
 import type { CometId } from '../../types';
-import { COMET_ORDER, AREAS_PER_COMET } from '../../meta/saveSchema';
+import { COMET_ORDER, EXPANSION_ORDER, AREAS_PER_COMET } from '../../meta/saveSchema';
 import { clamp } from '../format';
 import type { AreaSummary } from './types';
 
@@ -21,8 +21,8 @@ export function resurgenceIndices(areas: readonly AreaSummary[], cometId: CometI
   return list.length ? list : [0];
 }
 
-export function rowLengths(areas: readonly AreaSummary[]): number[] {
-  return COMET_ORDER.map((id) => AREAS_PER_COMET + resurgenceIndices(areas, id).length);
+export function rowLengths(areas: readonly AreaSummary[], order: readonly CometId[] = COMET_ORDER): number[] {
+  return order.map((id) => AREAS_PER_COMET + resurgenceIndices(areas, id).length);
 }
 
 /** Moves the cursor; up/down switch comets (column clamped to the new row), left/right walk the nodes. */
@@ -31,8 +31,8 @@ export function moveCursor(c: MapCursor, dx: number, dy: number, lens: readonly 
   return { row, col: clamp(c.col + dx, 0, lens[row] - 1) };
 }
 
-export function nodeAt(c: MapCursor, areas: readonly AreaSummary[]): MapNode {
-  const cometId = COMET_ORDER[c.row];
+export function nodeAt(c: MapCursor, areas: readonly AreaSummary[], order: readonly CometId[] = COMET_ORDER): MapNode {
+  const cometId = order[c.row];
   if (c.col < AREAS_PER_COMET) return { cometId, index: c.col, resurgence: false };
   return { cometId, index: resurgenceIndices(areas, cometId)[c.col - AREAS_PER_COMET] ?? 0, resurgence: true };
 }
@@ -41,10 +41,9 @@ export function findArea(areas: readonly AreaSummary[], n: MapNode): AreaSummary
   return areas.find((a) => a.cometId === n.cometId && a.index === n.index && a.resurgence === n.resurgence);
 }
 
-/** Overall area number 1..28 (Resurgence maps count as 29+ in comet order). */
+/** Regular campaign areas run across both packs. Resurgences are labelled separately. */
 export function areaNumber(n: MapNode): number {
-  const c = COMET_ORDER.indexOf(n.cometId);
-  return n.resurgence ? AREAS_PER_COMET * COMET_ORDER.length + c + 1 : c * AREAS_PER_COMET + n.index + 1;
+  return [...COMET_ORDER, ...EXPANSION_ORDER].indexOf(n.cometId) * AREAS_PER_COMET + n.index + 1;
 }
 
 export function placeholderArea(n: MapNode): AreaSummary {

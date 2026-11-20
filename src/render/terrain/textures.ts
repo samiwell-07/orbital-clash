@@ -1,23 +1,16 @@
 import * as THREE from 'three';
 import { type CanvasFactory, defaultCanvasFactory, putRgba } from './canvas';
 import { type FloorSample, type FloorSpec, floorColors } from './floorCommon';
-import { sampleHex, samplePanels } from './floorMetal';
+import { samplePanels } from './floorMetal';
 import { sampleDunes, sampleIce, sampleLava, sampleOrganic } from './floorNatural';
 import type { FloorPattern, Palette } from './palettes';
 
-const SQ3 = Math.sqrt(3);
-const HEX_PPT = 96;
 const PPT = 128;
 
 /** Pixel size of one seamless repeat and how many tiles of the map it spans. */
 export function floorSpec(pattern: FloorPattern): FloorSpec {
-  if (pattern === 'hex') {
-    const w = 3 * 2 * 2 * HEX_PPT;
-    const h = Math.round(SQ3 * 2 * 2 * HEX_PPT);
-    return { w, h, tilesX: w / HEX_PPT, tilesY: h / HEX_PPT };
-  }
-  if (pattern === 'panels') return { w: 512, h: 512, tilesX: 4, tilesY: 4 };
-  return { w: 1024, h: 1024, tilesX: 1024 / PPT, tilesY: 1024 / PPT };
+  const tiles = pattern === 'hex' || pattern === 'panels' ? 4 : 8;
+  return { w: tiles * PPT, h: tiles * PPT, tilesX: tiles, tilesY: tiles };
 }
 
 export interface FloorBytes {
@@ -29,7 +22,7 @@ export interface FloorBytes {
 }
 
 const SAMPLERS = {
-  hex: sampleHex,
+  hex: samplePanels,
   panels: samplePanels,
   organic: sampleOrganic,
   dunes: sampleDunes,

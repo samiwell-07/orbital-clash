@@ -76,7 +76,7 @@ export function createTerrainLayer(ctx: RenderContext, options: TerrainOptions =
     content.add(floor);
     rocks = buildRocks(g, palette, staticBin);
     craters = buildCraterGlow(g, palette, staticBin);
-    grid = buildGridLines(g, palette, staticBin, options.gridOpacity);
+    grid = buildGridLines(g, geo, palette, staticBin, options.gridOpacity);
     grid.visible = gridVisible;
     dust = buildDust(g.w, g.h, palette, staticBin);
     backdrop = buildBackdrop(palette, g.w / 2, g.h / 2, staticBin);

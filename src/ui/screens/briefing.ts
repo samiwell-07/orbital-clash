@@ -9,10 +9,12 @@ import { Form } from '../menus/form';
 import { drawForm } from '../menus/formDraw';
 import { drawIcon } from '../widgets/icon';
 import { drawPanel } from '../widgets/panel';
+import { drawMapPreview } from '../widgets/mapPreview';
 import { areaNumber } from './campaignNav';
 import { drawFooter } from './common';
 import { COMET_COLORS } from './campaignDraw';
 import { DIFFICULTY_LABELS, DIFFICULTY_ORDER } from './settings';
+import type { OnlineOption } from './battle';
 import type { AreaSummary, Screen, ScreenCtx } from './types';
 
 export function difficultyBlurb(i: number): string {
@@ -22,7 +24,7 @@ export function difficultyBlurb(i: number): string {
   return `Enemy ${pct(m.enemy)} · Thorium ${pct(m.thorium)} · ${penalty}${ranked}`;
 }
 
-export function createBriefingScreen(area: AreaSummary): Screen {
+export function createBriefingScreen(area: AreaSummary, opts: OnlineOption = {}): Screen {
   let form: Form | null = null;
   const build = (ctx: ScreenCtx): Form => {
     const save = ctx.data.save;
@@ -44,10 +46,11 @@ export function createBriefingScreen(area: AreaSummary): Screen {
         const difficulty = DIFFICULTY_ORDER[form.value('difficulty')];
         const lobby = createLobbyScreen({
           title: area.name,
-          subtitle: `Co-op · up to ${MAX_COOP_PLAYERS} players`,
+          subtitle: `${opts.online ? 'Online co-op' : 'Co-op'} · up to ${MAX_COOP_PLAYERS} players`,
           // The alien (player 1) keeps red.
           rules: { minPlayers: 1, maxPlayers: MAX_COOP_PLAYERS, takenColors: [1] },
           onStart: (seats) => ({ t: 'startCampaign', cometId: area.cometId, index: area.index, resurgence: area.resurgence, difficulty, seats }),
+          autoHost: opts.online,
         });
         return { t: 'push', screen: lobby };
       }
@@ -59,7 +62,7 @@ export function createBriefingScreen(area: AreaSummary): Screen {
       const left = { x: 70, y: 90, w: size.w * 0.52, h: size.h - 190 };
       drawPanel(g, left, { chamfer: 16, alpha: 0.9, edge: accent });
       const px = left.x + 40;
-      drawText(g, `${humanize(area.cometId).toUpperCase()}  ·  AREA ${area.number ?? areaNumber(area)}${area.resurgence ? '  ·  RESURGENCE' : ''}`, px, left.y + 46, { size: 17, color: accent, spacing: 4, weight: 700 });
+      drawText(g, `${humanize(area.cometId).toUpperCase()}  ·  ${area.resurgence ? 'RESURGENCE' : `AREA ${area.number ?? areaNumber(area)}`}`, px, left.y + 46, { size: 17, color: accent, spacing: 4, weight: 700 });
       drawText(g, area.name, px, left.y + 100, { size: 52, color: '#fff', weight: 700 });
       let y = left.y + 160;
       if (area.briefing) {
@@ -83,6 +86,10 @@ export function createBriefingScreen(area: AreaSummary): Screen {
       const fx = left.x + left.w + 40;
       drawForm(g, form, { x: fx, y: 130, w: size.w - fx - 70, h: 460 }, now, { rowH: 62, gap: 12 });
       drawText(g, difficultyBlurb(form.value('difficulty')), fx, 460, { size: 17, color: COLORS.dim, weight: 500 });
+      if (area.rows?.length) {
+        drawText(g, 'MAP PREVIEW', fx, 530, { size: 20, color: COLORS.cyan, spacing: 3, weight: 700 });
+        drawMapPreview(g, fx, 560, 340, area.rows, area.cometId);
+      }
       drawFooter(g, size.h, ctx.data.save.settings.controlsDisplay, [{ key: 'move', label: 'Select' }, { key: 'adjust', label: 'Change' }, { key: 'back', label: 'Back' }]);
     },
   };

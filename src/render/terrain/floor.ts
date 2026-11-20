@@ -4,7 +4,7 @@ import { type FloorTextures } from './textures';
 import { fbm, smoothstep } from './noise';
 import type { Palette } from './palettes';
 
-const SEG = 4;
+export const FLOOR_SEGMENTS_PER_TILE = 4;
 
 const isTerrain = (g: Grid, tx: number, ty: number, t: number): boolean =>
   tx >= 0 && ty >= 0 && tx < g.w && ty < g.h && g.terrain[ty * g.w + tx] === t;
@@ -45,8 +45,8 @@ function cliffDistance(g: Grid, x: number, z: number): number {
 
 /** Heightfield plateau floor: craters are real depressions; vertex colours bake soft AO and large-scale variation. */
 export function buildFloorGeometry(g: Grid, spec: FloorTextures['spec']): THREE.BufferGeometry {
-  const nx = g.w * SEG;
-  const nz = g.h * SEG;
+  const nx = g.w * FLOOR_SEGMENTS_PER_TILE;
+  const nz = g.h * FLOOR_SEGMENTS_PER_TILE;
   const count = (nx + 1) * (nz + 1);
   const pos = new Float32Array(count * 3);
   const uv = new Float32Array(count * 2);
@@ -54,8 +54,8 @@ export function buildFloorGeometry(g: Grid, spec: FloorTextures['spec']): THREE.
   let k = 0;
   for (let j = 0; j <= nz; j++) {
     for (let i = 0; i <= nx; i++, k++) {
-      const x = i / SEG;
-      const z = j / SEG;
+      const x = i / FLOOR_SEGMENTS_PER_TILE;
+      const z = j / FLOOR_SEGMENTS_PER_TILE;
       const c = craterShape(g, x, z);
       pos.set([x, c.pit + c.rim, z], k * 3);
       uv.set([x / spec.tilesX, 1 - z / spec.tilesY], k * 2);

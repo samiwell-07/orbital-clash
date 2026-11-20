@@ -22,7 +22,7 @@ describe('createWorld', () => {
     expect(w.players[1].attack.targetPlayer).toBe(0);
     expect(w.players[0].thorium).toBe(Math.round(BASE_START_THORIUM * DIFFICULTY_MULT.normal.thorium));
     expect(w.players[0].maxHits).toBe(10);
-    expect(w.grid.w).toBe(48);
+    expect(w.grid.w).toBe(w.grid.h);
     expect(w.units).toHaveLength(0);
     expect(w.nextId).toBe(1);
   });
@@ -42,6 +42,11 @@ describe('createWorld', () => {
   });
 
   it('default map is symmetric with connected bases', () => {
+    const compact = generateDefaultMap('compact', 18, 20);
+    for (const tile of compact.baseTiles) {
+      if (!tile) continue;
+      for (let dy = -2; dy <= 2; dy++) expect(compact.rows[tile.ty + dy].slice(tile.tx - 2, tile.tx + 3)).toBe('.....');
+    }
     const m = generateDefaultMap('x');
     const g = createGrid(m);
     for (let y = 0; y < m.h; y++) {

@@ -77,6 +77,20 @@ export function createRockVariants(p: Palette): THREE.BufferGeometry[] {
   return [1, 2, 3, 4].map((seed) => rockVariant(p, seed * 7));
 }
 
+/** A tapered saddle between two caps; its ends are buried in the caps. */
+export function createWallRidge(p: Palette): THREE.BufferGeometry {
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const pos = geo.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) {
+    const top = pos.getY(i) > 0;
+    const width = top ? (p.rock.style === 'metal' ? 0.56 : 0.38) : 0.78;
+    pos.setXYZ(i, pos.getX(i) * width, top ? 1 : -0.02, pos.getZ(i));
+  }
+  geo.computeVertexNormals();
+  paint(geo, p, 23);
+  return geo;
+}
+
 /** Faceted crystal cluster (3 spikes), base at y = 0. */
 export function createCrystalGeometry(): THREE.BufferGeometry {
   const spikes: THREE.BufferGeometry[] = [];

@@ -37,8 +37,7 @@ export function resolveMap(id: string): MapDef {
 }
 
 /**
- * Placeholder 48x30 plateau: cliff rim and four-fold symmetric craters/rock clusters.
- * The central cross (x 22..25, y 14..15) and base surroundings stay clear, so every base is connected.
+ * Fallback plateau: mirrored rock walls flank a clear central crossing and four open base pads.
  */
 export function generateDefaultMap(id: string, w = MAP_W, h = MAP_H): MapDef {
   const g: string[][] = [];
@@ -59,25 +58,19 @@ export function generateDefaultMap(id: string, w = MAP_W, h = MAP_H): MapDef {
   ];
   const rnd = mulberry32(hashString(id));
   const set = (x: number, y: number, c: string) => {
+    if (bases.some((b) => Math.abs(x - b.tx) <= 2 && Math.abs(y - b.ty) <= 2)) return;
     for (const [mx, my] of [[x, y], [w - 1 - x, y], [x, h - 1 - y], [w - 1 - x, h - 1 - y]]) {
       if (mx >= rim && my >= rim && mx < w - rim && my < h - rim) g[my][mx] = c;
     }
   };
   const cx = w / 2 - 2;
   const cy = h / 2 - 1;
-  for (let k = 0; k < 9; k++) {
-    const bx = 9 + Math.floor(rnd() * (cx - 10));
-    const by = 5 + Math.floor(rnd() * (cy - 6));
-    const kind = rnd() < 0.55 ? '#' : 'o';
-    const size = 1 + Math.floor(rnd() * 2);
-    for (let dy = 0; dy < size; dy++) {
-      for (let dx = 0; dx < size + (k % 2); dx++) {
-        const x = bx + dx;
-        const y = by + dy;
-        if (bases.every((b) => Math.hypot(b.tx - x, b.ty - y) > 4.5) && x < cx && y < cy) set(x, y, kind);
-      }
-    }
-  }
+  const bend = Math.floor(cy) - 2 - Math.floor(rnd() * 2);
+  const tip = Math.floor(cx) - 1;
+  for (let y = rim; y <= bend; y++) set(tip, y, '#');
+  for (let x = tip - 2; x < tip; x++) set(x, bend, '#');
+  for (let x = rim; x <= 6; x++) set(x, Math.floor(cy) - 1, '#');
+  set(tip - 2, rim + 1, 'o');
   return {
     id,
     name: id,

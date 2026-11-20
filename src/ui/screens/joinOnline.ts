@@ -94,7 +94,7 @@ export function createJoinOnlineScreen(): Screen {
     },
     draw(g, size, now, ctx) {
       const { w, h } = size;
-      drawHeader(g, w, 'Join Online', "Enter the room code shown in the host's lobby");
+      drawHeader(g, w, 'Join Lobby', "Enter the room code shown in the host's lobby");
       const bw = 130;
       const bh = 160;
       const gap = 28;
@@ -119,7 +119,7 @@ export function createJoinOnlineScreen(): Screen {
         glowText(g, 'Connecting…', w / 2, sy, { size: 30, color: '#fff', glow: COLORS.cyan, align: 'center', weight: 700, alpha: 0.6 + 0.4 * Math.sin(now * 4) });
       } else if (error) drawText(g, error, w / 2, sy, { size: 24, color: COLORS.danger, align: 'center', weight: 700 });
       else drawText(g, 'Type the digits, or use ▲ ▼ to change a digit and ◀ ▶ to move', w / 2, sy, { size: 20, color: COLORS.dim, align: 'center', weight: 500 });
-      drawText(g, 'The host opens the room with Y / △ (keyboard R) in any lobby', w / 2, sy + 44, { size: 17, color: rgba(COLORS.dim, 0.8), align: 'center', weight: 500 });
+      drawText(g, 'The host opens a room with Multiplayer → Create Lobby (or Y / △, keyboard R, in any lobby)', w / 2, sy + 44, { size: 17, color: rgba(COLORS.dim, 0.8), align: 'center', weight: 500 });
       drawFooter(g, h, ctx.data.save.settings.controlsDisplay, [{ key: 'confirm', label: 'Join' }, { key: 'move', label: 'Digit' }, { key: 'back', label: 'Delete · Back' }]);
     },
   };

@@ -7,6 +7,7 @@ import {
 } from '@/meta';
 import type { ResultsProps } from '@/ui';
 import type { Session } from './session';
+import { nextAreaCommand } from './runSpec';
 import { rangeAt } from './session';
 import type { TerrainLayer } from '@/render/terrain';
 
@@ -97,7 +98,7 @@ export function finishRun(session: Session, save: SaveData): Finish {
     props: {
       ...base, rank: computeRank(res.timeSec, res.penaltySec, res.parTimeSec, res.difficulty), score, boardKey: key,
       qualifies: qualifies(rec.save.leaderboards, key, score), trophyNames: names,
-      hasNext: !mission.resurgence && mission.index < 6, newBestTime: rec.newBestTime,
+      hasNext: nextAreaCommand(spec.command, rec.save) !== null, newBestTime: rec.newBestTime,
     },
   };
 }

@@ -1,12 +1,15 @@
-import type { CometId, Mission, Objective, UnitKind, WeaponKind } from '@/types';
+import type { CometId, MapDef, Mission, Objective, UnitKind, WeaponKind } from '@/types';
 import { DIFFICULTY_MULT } from '@/config/constants';
 import { makeMap } from './builders';
 import type { MapSpec } from './builders';
 import { Layout } from './layout';
+import { rockGridMap } from './rockGrids';
 import { registerSeed } from './seeds';
 import { Script } from './script';
 
-export const COMETS: readonly CometId[] = ['kreios', 'hathor', 'aether', 'helios'];
+export const ORIGINAL_COMETS = ['kreios', 'hathor', 'aether', 'helios'] as const;
+export type OriginalComet = (typeof ORIGINAL_COMETS)[number];
+export const COMETS: readonly CometId[] = [...ORIGINAL_COMETS, 'gaia', 'kronos'];
 
 /** Tech each area newly teaches (Fandom unlock order); null = nothing new. */
 export const TEACH: Readonly<Record<CometId, readonly (string | null)[]>> = {
@@ -14,6 +17,8 @@ export const TEACH: Readonly<Record<CometId, readonly (string | null)[]>> = {
   hathor: ['pulsar', 'thief', 'bomber', null, null, null, null],
   aether: ['drone', 'switches', null, null, 'torpedoes', 'carrier', null],
   helios: [null, 'waypoint', null, null, null, null, null],
+  // Expansion pilots inherit the base campaign's tech; new research is purchased at a lab.
+  gaia: Array(7).fill(null), kronos: Array(7).fill(null),
 };
 
 /** Human tech at the start of an area: everything taught by earlier areas (a Resurgence has all of its comet). */
@@ -42,11 +47,11 @@ export interface AreaSpec {
   alt?: Objective;
 }
 
-const WEAPON_ORDER: Record<CometId, WeaponKind[]> = {
+const WEAPON_ORDER: Record<OriginalComet, WeaponKind[]> = {
   kreios: ['turret', 'laser'], hathor: ['pulsar', 'turret', 'bomber', 'laser'],
   aether: ['laser', 'bomber', 'turret', 'pulsar'], helios: ['bomber', 'pulsar', 'laser', 'turret'],
 };
-const UNIT_ORDER: Record<CometId, UnitKind[]> = {
+const UNIT_ORDER: Record<OriginalComet, UnitKind[]> = {
   kreios: ['scout', 'tank', 'hammer'], hathor: ['scout', 'thief', 'tank', 'torpedo'],
   aether: ['scout', 'drone', 'carrier', 'switch', 'torpedo', 'tank'],
   helios: ['scout', 'tank', 'drone', 'torpedo', 'hammer', 'thief', 'switch', 'carrier'],
@@ -62,7 +67,7 @@ function waveCount(kind: UnitKind, ai: number, k: number, joined: number, bonus:
   return Math.max(1, Math.round(base * (1 + 0.35 * (k - joined)) * bonus));
 }
 
-function buildScript(comet: CometId, spec: AreaSpec, enemyTech: Set<string>, alien: string[], layout: Layout, resurgence: boolean): Script {
+function buildScript(comet: OriginalComet, spec: AreaSpec, enemyTech: Set<string>, alien: string[], layout: Layout, resurgence: boolean): Script {
   const s = new Script();
   const { ai, par } = spec;
   const weapons = WEAPON_ORDER[comet].filter((w) => !WEAPON_TECH[w] || enemyTech.has(WEAPON_TECH[w] as string));
@@ -113,23 +118,43 @@ function buildScript(comet: CometId, spec: AreaSpec, enemyTech: Set<string>, ali
 }
 
 /** Builds one authored Mission: own map, scripted enemy timeline, objectives, hints, par and difficulty ramp. */
-export function makeMission(comet: CometId, index: number, spec: AreaSpec, resurgence = false): Mission {
-  const id = resurgence ? `${comet}-r` : `${comet}-${index + 1}`;
+export function makeMission(comet: OriginalComet, index: number, spec: AreaSpec, resurgence = false): Mission {
   const teaches = resurgence ? null : TEACH[comet][index];
   const unlocked = unlockedBefore(comet, index, resurgence);
-  const map = makeMap({ ...spec.map, id: `campaign-${id}`, name: spec.name, palette: comet });
+  const map = areaMap(comet, index, spec, resurgence);
   const layout = new Layout(map);
   const enemyTech = new Set([...unlocked, ...(teaches ? [teaches] : []), ...(spec.extraTech ?? [])]);
   // `teaches` is granted to every player by createWorld; the script only unlocks the enemy's extra alien tech.
   const alien = [...(spec.extraTech ?? [])];
   const script = buildScript(comet, spec, enemyTech, alien, layout, resurgence);
+  return finishMission(comet, index, spec, resurgence, 'base', map, script);
+}
+
+type MissionSpec = Omit<AreaSpec, 'ai' | 'extraTech'>;
+
+function areaId(comet: CometId, index: number, resurgence: boolean): string {
+  return resurgence ? `${comet}-r` : `${comet}-${index + 1}`;
+}
+
+/** Areas with an original rock grid (grids/NN.txt for area NN) use it; the others are generated from spec.map. */
+export function areaMap(comet: CometId, index: number, spec: MissionSpec, resurgence: boolean): MapDef {
+  const id = `campaign-${areaId(comet, index, resurgence)}`;
+  const grid = resurgence ? null : rockGridMap(COMETS.indexOf(comet) * 7 + index + 1,
+    { id, name: spec.name, palette: comet, thorium: spec.map.thorium, rocks: spec.map.rocks });
+  return grid ?? makeMap({ ...spec.map, id, name: spec.name, palette: comet });
+}
+
+export function finishMission(comet: CometId, index: number, spec: MissionSpec, resurgence: boolean,
+  profile: Mission['profile'], map: MapDef, script: Script): Mission {
+  const id = areaId(comet, index, resurgence);
   const m = DIFFICULTY_MULT;
   const hit = (mult: number) => Math.min(100, Math.max(1, Math.round(spec.hits * mult)));
   const objectives: Objective[] = [{ id: 'base', text: 'Destroy the alien base', type: 'destroyBase', value: 1 }];
   if (spec.alt) objectives.push(spec.alt);
   registerSeed(id, script.stock());
   return {
-    id, comet, index, name: spec.name, profile: 'base', map, startThorium: spec.start, unlocked, teaches,
+    id, comet, index, name: spec.name, profile, map, startThorium: spec.start,
+    unlocked: unlockedBefore(comet, index, resurgence), teaches: resurgence ? null : TEACH[comet][index],
     preplaced: script.pre, timeline: script.events, objectives, parTimeSec: spec.par, resurgence,
     hints: resurgence ? [] : spec.hints ?? [],
     enemyHits: {

@@ -1,4 +1,4 @@
-import type { CometId, Difficulty, NewGameOptions, PlayerId, PlayerSlot } from '@/types';
+import type { Difficulty, NewGameOptions, PlayerId, PlayerSlot } from '@/types';
 import { PLAYER_IDS } from '@/types';
 import { DEFAULT_HITS, MAX_HITS, MIN_HITS } from '@/config/constants';
 import { findMap, registerMap } from '@/sim/core/defaultMap';
@@ -44,7 +44,6 @@ export class BattleSetupError extends Error {
 }
 
 const DIFFICULTIES: readonly Difficulty[] = ['beginner', 'casual', 'normal', 'expert'];
-const COMETS: readonly CometId[] = ['kreios', 'hathor', 'aether', 'helios'];
 export const FREE_BASE_SUFFIX = ':free';
 
 /** Resolves a battle map id, accepting the `:free` variant that has no preset starts. */
@@ -110,7 +109,7 @@ export function startBattle(setup: BattleSetup): NewGameOptions {
       timeLimitSec: setup.timeLimitSec ?? 0,
       strength,
       mission: null,
-      comet: map && COMETS.includes(map.palette as CometId) ? (map.palette as CometId) : null,
+      comet: map?.palette ?? null,
       seed: setup.seed ?? 1,
     },
     slots,

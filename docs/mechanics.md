@@ -6,7 +6,7 @@ Complete gameplay spec for Orbital Clash (clone of PS3 *Comet Crash*, Pelfast 20
 - **[observed]** read from the reference screenshots/video frames, trophy guide or Fandom wiki search snippets (the wiki itself returned 403; only search snippets were usable, so wiki facts are partial).
 - **[tuned/guess]** our own decision. All numbers in the balance tables are tuned and live in `src/data` (never hard-coded in systems).
 
-Types referenced: `src/types/ids.ts`, `defs.ts`, `mission.ts`, `input.ts`; constants in `src/config/constants.ts` (map 48x30, `STORAGE_CAP` 1000, hits 1..100, ship physics).
+Types referenced: `src/types/ids.ts`, `defs.ts`, `mission.ts`, `input.ts`; constants in `src/config/constants.ts` (square map bounds, `STORAGE_CAP` 1000, hits 1..100, ship physics).
 
 ---
 
@@ -335,7 +335,11 @@ Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**,
 | 27 | Helios | Heat Sink | multi-lane defence + carrier rushes | 55 | 9 | 560 | 14:00 |
 | 28 | Helios | Sun Core | finale: full toolkit, tough AI | 60 | 9 | 600 | 14:30 |
 
-Ramp rules [tuned]: `startThorium` baseline 300 + 10-20 per area; AI aggression 1->9; enemy hits 5->60; hints available in areas 1-28 (Beginner/Casual always, Normal 1-6 only, Expert none); Kreios areas 1-3 use the 30x20 plateau, later areas up to 40x26, finales up to 48x30. Enemy scripts: timeline `release` events plus reactive AI.
+Ramp rules [tuned]: `startThorium` baseline 300 + 10-20 per area; AI aggression 1->9; enemy hits 5->60; hints available in areas 1-28 (Beginner/Casual always, Normal 1-6 only, Expert none). Each regular area and Resurgence has its own square plateau. Areas 1-40 use the original 30x30 rock layouts in `src/data/areas/grids/NN.txt` (file NN = area NN, `X` = rock, `.` = floor); the human and enemy bases go on the two clear 3x3 pads farthest apart on foot (human nearer the top-left) and co-op pads on the clear spots nearest the human. Areas 41-42 and the Resurgences keep generated plateaus. Enemy scripts: timeline `release` events plus reactive AI.
+
+Highlight any Campaign area, including a locked area or Resurgence, to see its square terrain preview. The briefing keeps that preview visible while you choose difficulty.
+
+For playtesting, open the game with `?unlockMaps=1` to launch any Original or Expansion mission from the picker without marking it complete. Remove the query parameter to restore normal access.
 
 ### 12.2 Resurgence (no hints, more challenging) [official premise; maps tuned]
 | # | Unlocks after | Name | Focus | enemyHits | AI | Start | Par |
@@ -346,23 +350,19 @@ Ramp rules [tuned]: `startThorium` baseline 300 + 10-20 per area; AI aggression 
 | R4 | Helios 22-28 | Helios Resurgence | all units, switches and thieves, relentless | 100 | 10 | 450 | 20:00 |
 
 ### 12.3 Bionic Swarm campaign (profile `bionic`, optional content)
-Gaia areas 29-36 and Kronos areas 37-44 (8 each), unlock `bionic` (research lab, harvester, silo, missile defence, snake, dragon), AI uses missiles from area 34 [observed]. Names/lists to be authored by the campaign owner using the same ramp rules (hits 50->120 capped at 100 on Max Hits, AI 8->10, par 12-24 min). Area 41 (Kronos 5) = shortcut opened by destroying key structures [observed].
+Open Campaign → Expansion to play Gaia (Areas 29–35) and Kronos (36–42), plus one Resurgence per comet. These are original Orbital Clash layouts using the Bionic ruleset. Gaia Area 29 can be started without completing the original campaign. Highlight a node for its terrain preview, then confirm an unlocked mission to open the briefing.
 
-### 12.4 Battle maps (4 base + 4 bionic)
-`thoriumLevel` 1 = low, 2 = medium, 3 = high (1-3 Thorium symbols under the map). Sizes in tiles, all within the 48x30 grid.
+### 12.4 Battle maps
+The 16 selectable arenas are square (28–30 tiles per side). Rock walls occupy cells that share edges, with openings into buildable rooms. Opposite starts are rotationally symmetric; four-corner arenas also mirror the terrain between corners. Free-base arenas leave space to found a base in each quadrant.
 
-| # | Profile | Name | Size / description | Players | thoriumLevel | Palette |
-|---|---|---|---|---|---|---|
-| 1 | base | Kreios Crater | 36x24, central rock ring with 4 corner starts | 2-4 | 2 | kreios |
-| 2 | base | Hathor Dunes | 40x26, wide open sand with scattered rock pillars, 4 starts | 2-4 | 3 | hathor |
-| 3 | base | Aether Drift | 44x24, long horizontal corridor, two flanking lanes, 2-player focus | 2 | 1 | aether |
-| 4 | base | Helios Forge | 48x30, huge arena, magma chokepoints at the centre | 2-4 | 2 | helios |
-| 5 | bionic | Gaia Hollow | 40x26, organic cave with a winding mid corridor, many small rocks | 2-4 | 3 | gaia |
-| 6 | bionic | Gaia Roots | 36x28, vertical map, four root-like lanes, tight fights | 2-4 | 2 | gaia |
-| 7 | bionic | Kronos Grid | 44x28, hex panels, symmetrical lanes with cyan inlay circuits | 2-4 | 2 | kronos |
-| 8 | bionic | Kronos Vault | 48x30, fully enclosed with a central silo cross, 3-4 players | 3-4 | 1 | kronos |
+| Comet | Base | Patch 1.03 | Expansion |
+|---|---|---|---|
+| Kreios | Crater | Ridge | Fissure, Basin |
+| Hathor | Dunes | Oasis | Mesa, Canyon |
+| Aether | Drift | Spires | Prism, Halo |
+| Helios | Forge | Furnace | Caldera, Vents |
 
-Palette for bionic maps uses `gaia`/`kronos` keys (not in `CometId`; add as optional `palette` extension per the render-engine owner).
+`thoriumLevel` 1 = low, 2 = medium, 3 = high (1–3 symbols under the square terrain preview).
 
 ---
 

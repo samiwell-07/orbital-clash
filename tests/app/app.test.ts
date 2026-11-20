@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { registerAllSystems } from '@/app/registerSystems';
-import { buildRun } from '@/app/runSpec';
+import { buildRun, nextAreaCommand, type StartCommand } from '@/app/runSpec';
 import { createSession } from '@/app/session';
 import { battleOutcome, finishRun } from '@/app/runEnd';
 import { newSave } from '@/meta';
+import { resolvePaletteId } from '@/render/terrain/palettes';
 import { createKeyboard } from '@/input/keyboard';
 import type { PlayerId } from '@/types';
 
@@ -30,11 +31,45 @@ describe('app glue', () => {
         slots: [{ human: true, team: 0, strength: 1 }, { human: false, team: 1, strength: 1 }],
       },
     });
+
     if (typeof spec === 'string') throw new Error(spec);
     expect(spec.bindings).toEqual([{ player: 0, device: 'kb1', peer: 0 }]);
     const session = createSession(spec);
     expect(session.sim.world.players.slice(0, 2).map((p) => p.colorIndex)).toEqual([6, 1]);
     session.dispose();
+  });
+
+  it('launches and scores the expansion with its own worlds, including both Resurgences', () => {
+    const seats = [{ device: 'kb1' as const, colorIndex: 2 }];
+    let save = newSave();
+    for (const cometId of ['gaia', 'kronos'] as const) {
+      for (let i = 0; i < 8; i++) {
+        const resurgence = i === 7;
+        const index = resurgence ? 0 : i;
+        const cmd: StartCommand = { t: 'startCampaign', cometId, index, resurgence, difficulty: 'normal', seats };
+        const spec = buildRun(cmd);
+        if (typeof spec === 'string') throw new Error(spec);
+        const session = createSession(spec);
+        try {
+          const world = session.sim.world;
+          expect(world.settings).toMatchObject({ comet: cometId, profile: 'bionic', mission: { comet: cometId, index, resurgence } });
+          expect(resolvePaletteId(world)).toBe(cometId);
+          world.players[1].hits = world.players[1].maxHits;
+          session.sim.step([]);
+          expect(session.sim.drainEvents().filter((e) => e.t === 'missionError')).toEqual([]);
+          const done = finishRun(session, save);
+          save = done.save;
+          expect(done.props).toMatchObject({ won: true, boardKey: `${cometId}:${resurgence ? 'r' : 'a'}${index}:normal` });
+          expect(save.lastPlayed).toMatchObject({ cometId, index, resurgence });
+          const next = nextAreaCommand(cmd, save);
+          expect(done.props.hasNext).toBe(next !== null);
+          if (resurgence || (cometId === 'kronos' && index === 6)) expect(next).toBeNull();
+          else expect(next).toEqual({ ...cmd, cometId: index === 6 ? 'kronos' : cometId, index: (index + 1) % 7 });
+        } finally {
+          session.dispose();
+        }
+      }
+    }
   });
 
   it('reports an invalid battle setup as a message instead of throwing', () => {

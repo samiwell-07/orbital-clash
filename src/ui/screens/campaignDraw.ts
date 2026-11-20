@@ -7,6 +7,8 @@ export const COMET_COLORS: Record<CometId, { base: string; glow: string; dark: s
   hathor: { base: '#e0b860', glow: '#37e0c8', dark: '#5a4420' },
   aether: { base: '#bfdcff', glow: '#b5e6ff', dark: '#3a5a8a' },
   helios: { base: '#ff6a2a', glow: '#ff7a2e', dark: '#3a1208' },
+  gaia: { base: '#82bc5e', glow: '#b2ea73', dark: '#253e28' },
+  kronos: { base: '#8885c9', glow: '#aad9ff', dark: '#2d2b55' },
 };
 
 /** Procedural comet: glowing sphere with craters and a tail. */

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { ALL_PALETTE_IDS, PALETTES, getPalette } from '@/render/terrain/palettes';
 import { fbm, hash2, hexCell, valueNoise, voronoi } from '@/render/terrain/noise';
 import { bakeFloorMaps, floorSpec, heightToNormal } from '@/render/terrain/textures';
-import type { PaletteId } from '@/types';
+import { Bin } from '@/render/terrain/dispose';
+import { buildRocks } from '@/render/terrain/rocks';
+import { buildFloorGeometry } from '@/render/terrain/floor';
+import { buildGridLines } from '@/render/terrain/grid';
+import type { Grid, PaletteId } from '@/types';
 
 const EXPECTED: PaletteId[] = ['kreios', 'hathor', 'aether', 'helios', 'gaia', 'kronos'];
 
@@ -100,10 +105,56 @@ describe('noise', () => {
 });
 
 describe('floor texture bake', () => {
-  it('uses a seamless hex period that is a whole number of plates', () => {
-    const s = floorSpec('hex');
-    expect(s.w / s.h).toBeCloseTo(Math.sqrt(3), 2);
-    expect(s.tilesX).toBeCloseTo(12, 6);
+  it.each(['kreios', 'kronos'] as const)('%s places a slab seam on every build edge, not every second edge', id => {
+    const b = bakeFloorMaps(PALETTES[id]);
+    const { w, h, tilesX, tilesY } = b.spec;
+    const red = (x: number, y: number) => b.albedo[(y * w + x) * 4];
+    for (let j = 0; j < tilesY; j++) for (let i = 0; i < tilesX; i++) {
+      const x = i * w / tilesX, y = j * h / tilesY;
+      const cx = x + w / tilesX / 2, cy = y + h / tilesY / 2;
+      expect(red(x, cy)).toBeLessThan(red(cx, cy) * 0.6);
+      expect(red(cx, y)).toBeLessThan(red(cx, cy) * 0.6);
+    }
+  });
+
+  describe('tile footprints', () => {
+    const grid = (w: number, cells: number[]): Grid => ({
+      w, h: cells.length / w, terrain: Uint8Array.from(cells), occupant: new Int32Array(cells.length),
+    });
+
+    it('outlines both unit squares exactly once without outlining rock', () => {
+      const g = grid(3, [0, 0, 1]);
+      const bin = new Bin();
+      const p = PALETTES.gaia;
+      const floor = bin.add(buildFloorGeometry(g, floorSpec(p.pattern)));
+      const pos = buildGridLines(g, floor, p, bin).geometry.getAttribute('position');
+      const edges: string[] = [];
+      for (let i = 0; i < pos.count; i += 2) {
+        edges.push(`${pos.getX(i)},${pos.getZ(i)}:${pos.getX(i+1)},${pos.getZ(i+1)}`);
+      }
+      expect(edges.sort()).toEqual(['0,0:0,1','0,0:1,0','0,1:1,1','1,0:1,1','1,0:2,0','1,1:2,1','2,0:2,1']);
+      bin.disposeAll();
+    });
+
+    it.each(['gaia', 'kronos'] as const)('%s joins the arms of an L while leaving the diagonal cell and crater clear', id => {
+      const g = grid(3, [1, 1, 2, 1, 0, 1]);
+      const bin = new Bin();
+      const { group } = buildRocks(g, PALETTES[id], bin);
+      const ray = new THREE.Raycaster();
+      const height = (x: number, z: number) => {
+        ray.set(new THREE.Vector3(x, 3, z), new THREE.Vector3(0, -1, 0));
+        return ray.intersectObjects(group.children)[0]?.point.y ?? 0;
+      };
+      for (let i = 0; i <= 10; i++) {
+        expect(height(0.5 + i / 10, 0.5)).toBeGreaterThan(0.2);
+        expect(height(0.5, 0.5 + i / 10)).toBeGreaterThan(0.2);
+      }
+      for (let z = 0.05; z < 1; z += 0.1) for (let x = 0.05; x < 1; x += 0.1) {
+        expect(height(1 + x, 1 + z)).toBe(0);
+        expect(height(2 + x, z)).toBe(0);
+      }
+      bin.disposeAll();
+    });
   });
 
   it('bakes Kronos with cyan emissive inlays and flat-up normals on average', () => {

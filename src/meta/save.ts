@@ -6,7 +6,7 @@ import { computeRank, betterRank, effectiveTime } from './rank';
 import type { Rank } from './rank';
 import { evaluateTrophies } from './trophies';
 import type { TrophyEvent } from './trophies';
-import { AREAS_PER_COMET, COMET_ORDER, newSave, sanitizeSave } from './saveSchema';
+import { AREAS_PER_COMET, COMET_ORDER, EXPANSION_ORDER, newSave, sanitizeSave } from './saveSchema';
 import type { AreaRecord, SaveData } from './saveSchema';
 
 export interface AreaCompleteInput {
@@ -72,10 +72,13 @@ export function isResurgenceUnlocked(save: SaveData, cometId: CometId): boolean 
   return isCometCleared(save, cometId);
 }
 
-/** The first comet is always open; each next one opens when the previous comet is cleared. */
+const orderFor = (id: CometId) => EXPANSION_ORDER.includes(id) ? EXPANSION_ORDER : COMET_ORDER;
+
+/** Each campaign starts unlocked and progresses independently. */
 export function isCometUnlocked(save: SaveData, cometId: CometId): boolean {
-  const i = COMET_ORDER.indexOf(cometId);
-  return i === 0 || (i > 0 && isCometCleared(save, COMET_ORDER[i - 1]));
+  const order = orderFor(cometId);
+  const i = order.indexOf(cometId);
+  return i === 0 || (i > 0 && isCometCleared(save, order[i - 1]));
 }
 
 export function isAreaUnlocked(save: SaveData, cometId: CometId, index: number, resurgence = false): boolean {
@@ -99,7 +102,8 @@ export function recordAreaComplete(save: SaveData, input: AreaCompleteInput): Ar
   const effective = effectiveTime(timeSec, penaltySec);
   const prev = getArea(save, cometId, index, resurgence);
   const wasCleared = isCometCleared(save, cometId);
-  const nextComet = COMET_ORDER[COMET_ORDER.indexOf(cometId) + 1] ?? null;
+  const order = orderFor(cometId);
+  const nextComet = order[order.indexOf(cometId) + 1] ?? null;
   const nextWasUnlocked = nextComet !== null && isCometUnlocked(save, nextComet);
 
   const record: AreaRecord = {

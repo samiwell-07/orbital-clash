@@ -8,12 +8,12 @@ import { createAudio, type GameAudio } from '@/audio';
 import { loadSave, saveSave, type SaveData } from '@/meta';
 import { createHud, createScreenManager, createTitleScreen, createResultsScreen, type Command, type UiData, type Hud } from '@/ui';
 import { missionSummaries } from '@/data/areas';
-import { battleMapSummaries } from '@/data/battle-maps';
+import { BATTLE_MAPS } from '@/data/battle-maps';
 import { createInput, type InputController } from '@/input';
 import { createShipPreview, type ShipPreview } from '@/render/preview';
 import { resetPlayerColorMap, setPlayerColorMap } from '@/config/playerColors';
 import { registerAllSystems } from './registerSystems';
-import { buildRun, type StartCommand } from './runSpec';
+import { buildRun, nextAreaCommand, type StartCommand } from './runSpec';
 import { createSession, type Session } from './session';
 import { createNetSession } from './netSession';
 import { createRoom } from '@/net/room';
@@ -98,14 +98,17 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
     }
   }
 
+  const unlockMaps = new URLSearchParams(location.search).get('unlockMaps') === '1';
   const data = (): UiData => ({
+    unlockMaps,
     save,
     areas: missionSummaries().map((a) => ({
       cometId: a.comet, index: a.index, resurgence: a.resurgence, name: a.name, number: a.number,
-      teaches: a.teaches, objectives: a.objectives, parTimeSec: a.parTimeSec,
+      teaches: a.teaches, objectives: a.objectives, parTimeSec: a.parTimeSec, rows: a.rows,
     })),
-    maps: battleMapSummaries().map((m) => ({
-      id: m.id, name: m.name, thoriumLevel: m.thoriumLevel, palette: m.palette, maxPlayers: m.maxPlayers,
+    maps: BATTLE_MAPS.map((m) => ({
+      id: m.id, name: m.name, thoriumLevel: m.thoriumLevel, palette: m.palette, maxPlayers: m.baseTiles.length,
+      rows: m.rows,
     })),
   });
   const screens = createScreenManager(data, createTitleScreen(), {
@@ -214,12 +217,6 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
     audio.music('menu');
   }
 
-  function nextAreaCommand(): StartCommand | null {
-    const c = session?.spec.command;
-    if (!c || c.t !== 'startCampaign') return null;
-    return { ...c, index: Math.min(6, c.index + 1) };
-  }
-
   function handle(cmd: Command | null): void {
     if (!cmd) return;
     switch (cmd.t) {
@@ -237,7 +234,7 @@ export function createApp({ gl, hud: hudCanvas }: AppDeps) {
         return session ? start(session.spec.command) : undefined;
       case 'nextArea': {
         if (room && !hosting()) return showNotice('Waiting for the host to continue…');
-        const n = nextAreaCommand();
+        const n = session && nextAreaCommand(session.spec.command, save);
         return n ? start(n) : toTitle();
       }
       case 'quitToTitle':

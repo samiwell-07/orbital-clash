@@ -3,7 +3,11 @@ import type { DeviceFrame, DeviceId } from '../../src/types';
 import type { GameMsg, LobbyView } from '../../src/net/protocol';
 import type { NetEvent, NetHooks, NetRole, NetRoom, NetStatus } from '../../src/net/types';
 import { createLobbyScreen } from '../../src/ui/screens/lobby';
-import { createJoinOnlineScreen } from '../../src/ui/screens/joinOnline';
+import { createJoinOnlineScreen, NEEDS_DEV_SERVER } from '../../src/ui/screens/joinOnline';
+import { createMultiplayerScreen } from '../../src/ui/screens/multiplayer';
+import { createTitleScreen } from '../../src/ui/screens/title';
+import { createBriefingScreen } from '../../src/ui/screens/briefing';
+import { placeholderArea } from '../../src/ui/screens/campaignNav';
 import { createRemoteLobbyScreen, HOST_CLOSED_TEXT } from '../../src/ui/screens/remoteLobby';
 import { NO_NAV, type Screen, type ScreenCtx, type UiNav } from '../../src/ui/screens/types';
 import { newSave } from '../../src/meta/saveSchema';
@@ -114,6 +118,62 @@ describe('host lobby online', () => {
     expect(t.step(scr, [f('pad0', { back: true })])).toEqual({ t: 'pop' });
     expect(t.net.leave).toHaveBeenCalledTimes(1);
     expect(room.listeners).toBe(0);
+  });
+});
+
+describe('multiplayer menu', () => {
+  const pushed = (out: unknown): string => (out as { t: string; screen: Screen }).screen.id;
+
+  it('the title has Multiplayer instead of Join Online and no Quit', () => {
+    const t = setup();
+    const title = createTitleScreen();
+    const texts = t.draw(title).map((s) => s.toLowerCase());
+    expect(texts).toContain('multiplayer');
+    expect(texts).not.toContain('quit');
+    expect(texts).not.toContain('join online');
+    t.step(title, [], { down: true });
+    t.step(title, [], { down: true });
+    expect(pushed(t.step(title, [], { confirm: true }))).toBe('multiplayer');
+  });
+
+  it('creates battle / co-op lobbies or joins one; without the relay only Back works', () => {
+    const t = setup();
+    const mp = createMultiplayerScreen();
+    const battle = (t.step(mp, [], { confirm: true }) as { screen: Screen }).screen;
+    expect(battle.id).toBe('battle');
+    expect(t.draw(battle)).toContain('Player 2 · Team');
+    t.step(mp, [], { down: true });
+    expect(pushed(t.step(mp, [], { confirm: true }))).toBe('campaign');
+    t.step(mp, [], { down: true });
+    expect(pushed(t.step(mp, [], { confirm: true }))).toBe('joinOnline');
+
+    const offline = setup();
+    offline.ctx.net = undefined;
+    const off = createMultiplayerScreen();
+    expect(offline.draw(off)).toContain(NEEDS_DEV_SERVER);
+    expect(offline.step(off, [], { confirm: true })).toEqual({ t: 'pop' });
+  });
+
+  it('a co-op lobby created from Multiplayer opens the room once, without pressing Y / R', () => {
+    const t = setup();
+    const briefing = createBriefingScreen(placeholderArea({ cometId: 'kreios', index: 0, resurgence: false }), { online: true });
+    t.step(briefing, [], { down: true });
+    const out = t.step(briefing, [], { confirm: true });
+    const lobby = (out as { screen: Screen }).screen;
+    t.step(lobby);
+    expect(t.net.host).toHaveBeenCalledTimes(1);
+    expect(t.room().role).toBe('host');
+    t.room().status = 'closed';
+    t.step(lobby);
+    t.step(lobby);
+    expect(t.net.host).toHaveBeenCalledTimes(1);
+  });
+
+  it('a local lobby does not auto-host', () => {
+    const t = setup();
+    const scr = createLobbyScreen({ title: 'Battle', rules: { minPlayers: 1, maxPlayers: 2, takenColors: [] }, onStart: () => ({ t: 'quit' }) });
+    t.step(scr);
+    expect(t.net.host).not.toHaveBeenCalled();
   });
 });
 

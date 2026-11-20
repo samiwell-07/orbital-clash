@@ -51,6 +51,7 @@ describe('battle map set', () => {
 
 describe.each(BATTLE_MAPS.map((m) => [m.id, m] as const))('map %s', (_id, m) => {
   it('has a valid size, glyphs, thorium level and rocks', () => {
+    expect(m.w).toBe(m.h);
     expect(m.w).toBeLessThanOrEqual(MAP_W);
     expect(m.h).toBeLessThanOrEqual(MAP_H);
     expect(m.rows).toHaveLength(m.h);
@@ -64,6 +65,25 @@ describe.each(BATTLE_MAPS.map((m) => [m.id, m] as const))('map %s', (_id, m) => 
     for (const r of m.rows) floor += r.split('').filter((c) => c === '.').length;
     expect(floor / (m.w * m.h)).toBeGreaterThan(0.55);
     expect(floor / (m.w * m.h)).toBeLessThan(0.92);
+  });
+
+  it('uses connected rock walls inside the rim, not scattered obstacles', () => {
+    const walls = m.rows.flatMap((row, y) => Array.from(row, (c, x) =>
+      c === '#' && x >= 2 && y >= 2 && x < m.w - 2 && y < m.h - 2 ? y * m.w + x : -1,
+    )).filter((i) => i >= 0);
+    const remaining = new Set(walls);
+    let longest = 0;
+    for (const i of walls) {
+      if (!remaining.delete(i)) continue;
+      const component = [i];
+      for (const cell of component) {
+        for (const n of [cell - 1, cell + 1, cell - m.w, cell + m.w]) {
+          if (remaining.delete(n)) component.push(n);
+        }
+      }
+      longest = Math.max(longest, component.length);
+    }
+    expect(longest).toBeGreaterThanOrEqual(7);
   });
 
   it('is rotationally symmetric so every player faces the same terrain', () => {

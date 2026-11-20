@@ -10,6 +10,8 @@ export interface LobbyOptions {
   subtitle?: string;
   rules: LobbyRules;
   onStart: (seats: Seat[]) => Command;
+  /** Open the room online as soon as the lobby appears (Multiplayer → Create Lobby). */
+  autoHost?: boolean;
 }
 
 export interface LobbyScreen extends Screen {
@@ -49,7 +51,7 @@ function onlineBanner(ctx: ScreenCtx): LobbyOnlineBanner | null {
   if (room.status === 'connecting' || !room.code) return { headline: 'ONLINE', detail: 'Opening room…' };
   const remote = room.peers.filter((p) => p !== room.me).length;
   const url = room.urls[0];
-  const join = url ? `Friends open ${url} → Join Online` : 'Friends choose Join Online';
+  const join = url ? `Friends open ${url} → Multiplayer → Join Lobby` : 'Friends choose Multiplayer → Join Lobby';
   return { headline: `ONLINE  Code ${room.code}`, detail: `${join}  ·  ${remote} remote player${remote === 1 ? '' : 's'} connected` };
 }
 
@@ -64,7 +66,8 @@ export function createLobbyScreen(opts: LobbyOptions): LobbyScreen {
   let unlisten: (() => void) | null = null;
   let queue: DeviceFrame[] = [];
   let lastKey: string | null = null;
-
+  // Auto-hosting is tried once; if it fails the banner shows why and Y / R can retry.
+  let autoHostPending = opts.autoHost === true;
   const view = (code: string): LobbyView => ({
     code,
     title: opts.title,
@@ -120,6 +123,10 @@ export function createLobbyScreen(opts: LobbyOptions): LobbyScreen {
       if (!ctx.devices) return nav.back ? { t: 'pop' } : null;
       // A successful start replaces the screen stack, so still being updated means the start failed.
       state.abortStart();
+      if (autoHostPending && ctx.net) {
+        autoHostPending = false;
+        if (!ctx.net.room()) ctx.net.host();
+      }
       const room = hostRoom(ctx);
       attach(room);
       if (!room) for (const p of new Set(state.seats.map((s) => s.peer).filter((p) => p !== 0))) state.dropPeer(p);

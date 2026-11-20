@@ -32,12 +32,12 @@ describe('camera fit', () => {
     });
   }
 
-  it('matches the style guide distance (~64 tiles) at 16:9 and is further at 4:3', () => {
+  it('fits a square plateau by its height at both landscape aspects', () => {
     const wide = computeFitDistance({ aspect: 16 / 9, mapW: MAP_W, mapH: MAP_H });
     const boxy = computeFitDistance({ aspect: 4 / 3, mapW: MAP_W, mapH: MAP_H });
     expect(wide).toBeGreaterThan(58);
     expect(wide).toBeLessThan(70);
-    expect(boxy).toBeGreaterThan(wide);
+    expect(boxy).toBeCloseTo(wide);
   });
 
   it('places the eye south of and above the map centre at the given pitch', () => {

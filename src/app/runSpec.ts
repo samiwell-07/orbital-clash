@@ -2,9 +2,19 @@ import type { NewGameOptions, Difficulty, DeviceId, Mission, Profile, PlayerId, 
 import { getMission } from '@/data/areas';
 import { startCampaign, HUMAN_SLOT_IDS } from '@/sim/modes/campaign';
 import { startBattle } from '@/sim/modes/battle';
+import { AREAS_PER_COMET, EXPANSION_ORDER, isCometUnlocked, type SaveData } from '@/meta';
 import type { BattleConfig, Command } from '@/ui';
 
 export type StartCommand = Extract<Command, { t: 'startCampaign' | 'startBattle' }>;
+
+/** Continue a numbered run with the same seats/difficulty. Resurgence is a separate replay. */
+export function nextAreaCommand(cmd: StartCommand, save: SaveData): StartCommand | null {
+  if (cmd.t !== 'startCampaign' || cmd.resurgence) return null;
+  if (cmd.index < AREAS_PER_COMET - 1) return { ...cmd, index: cmd.index + 1 };
+  const packIndex = EXPANSION_ORDER.indexOf(cmd.cometId);
+  const next = packIndex < 0 ? undefined : EXPANSION_ORDER[packIndex + 1];
+  return next && isCometUnlocked(save, next) ? { ...cmd, cometId: next, index: 0 } : null;
+}
 
 /** What a running session needs to remember beyond the simulation itself. */
 export interface RunSpec {

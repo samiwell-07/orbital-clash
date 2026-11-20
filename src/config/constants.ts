@@ -5,8 +5,8 @@ export const TICK_DT = 1 / TICK_HZ;
 export const MAX_STEPS_PER_FRAME = 5;
 
 /** Map size in tiles (campaign and battle plateaus fit within these). */
-export const MAP_W = 48;
 export const MAP_H = 30;
+export const MAP_W = MAP_H;
 
 /** Manual: a base can hold up to 1000 units. */
 export const STORAGE_CAP = 1000;

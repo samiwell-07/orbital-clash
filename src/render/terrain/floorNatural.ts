@@ -59,11 +59,11 @@ export function sampleIce(s: FloorSample, p: Palette, c: FloorColors, spec: Floo
   mixInto(s.rgb, c.base, c.alt, smoothstep(0.3, 0.7, cloud * 0.7 + hash2(vor.id, 2, 2) * 0.4));
   const frost = valueNoise(u * 96, v * 96, 96, 96, 6);
   scaleRgb(s.rgb, 0.92 + 0.12 * frost);
-  const crack = 1 - smoothstep(0.015, 0.05, edge);
+  const crack = (1 - smoothstep(0.015, 0.05, edge)) * smoothstep(0.42, 0.65, cloud);
   mixInto(s.rgb, s.rgb, c.seam, crack * 0.85);
-  s.h = smoothstep(0, 0.08, edge) * 0.8 + cloud * 0.2;
+  s.h = 0.6 - crack * 0.45 + cloud * 0.2;
   s.rough += 0.3 * (1 - cloud) * frost + crack * 0.4;
-  if (hash2(vor.id, 5, 5) < p.inlay.amount) addGlow(s, c.inlay, (1 - smoothstep(0.004, 0.02, edge)) * 0.8);
+  if (hash2(vor.id, 5, 5) < p.inlay.amount) addGlow(s, c.inlay, crack * 0.65);
 }
 
 /** Helios: black basalt plates with glowing lava veins in the cracks. */
@@ -75,13 +75,13 @@ export function sampleLava(s: FloorSample, p: Palette, c: FloorColors, spec: Flo
   const grit = fbm(u * 48, v * 48, 48, 48, 3, 2);
   mixInto(s.rgb, c.base, c.alt, hash2(vor.id, 3, 3) * 0.6 + grit * 0.4);
   scaleRgb(s.rgb, 0.8 + 0.4 * grit);
-  const bevel = smoothstep(0.03, 0.05, edge) * (1 - smoothstep(0.05, 0.09, edge));
+  const hot = smoothstep(0.42, 0.62, fbm(u * 10, v * 10, 10, 10, 3, 5));
+  const bevel = smoothstep(0.03, 0.05, edge) * (1 - smoothstep(0.05, 0.09, edge)) * hot;
   mixInto(s.rgb, s.rgb, c.bevel, bevel * 0.35);
-  const vein = 1 - smoothstep(0.012, 0.04, edge);
+  const vein = (1 - smoothstep(0.012, 0.04, edge)) * hot;
   mixInto(s.rgb, s.rgb, c.seam, vein);
-  s.h = smoothstep(0.01, 0.1, edge);
-  const heat = 0.55 + 0.9 * fbm(u * 10, v * 10, 10, 10, 3, 5);
+  s.h = grit * 0.25 + 0.75 - vein * 0.65;
   const branch = hash2(vor.id, 7, 7) < p.inlay.amount + 0.35 ? 1 : 0.3;
-  addGlow(s, c.inlay, vein * Math.min(1, heat) * branch);
+  addGlow(s, c.inlay, vein * branch);
   s.rough -= 0.25 * vein;
 }

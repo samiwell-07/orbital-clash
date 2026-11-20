@@ -1,76 +1,33 @@
-import type { MapDef } from '@/types';
-import { box, canvas, clearZone, corners, finish, line, rim, ring, rngFor, scatter } from './gen';
+import { arena } from './arena';
 
-/** 48x30, huge arena with a magma cross and rock-flanked chokepoints at the centre. */
-export function heliosForge(): MapDef {
-  const id = 'battle-helios-forge';
-  const c = canvas(48, 30, 'mirror4');
-  const bases = corners(48, 30, 6, 5);
-  const rnd = rngFor(id);
-  rim(c, 1, 5);
-  box(c, 23, 9, 24, 14, 'o');
-  box(c, 17, 14, 22, 15, 'o');
-  box(c, 19, 10, 21, 11, '#');
-  box(c, 23, 6, 24, 7, '#');
-  box(c, 14, 13, 15, 16, '#');
-  scatter(c, rnd, 6, { x0: 9, y0: 3, x1: 19, y1: 11 }, '#', 2);
-  scatter(c, rnd, 3, { x0: 9, y0: 3, x1: 19, y1: 11 }, 'o', 1);
-  clearZone(c, bases, 4);
-  return finish(c, { id, name: 'Helios Forge', palette: 'helios', thoriumLevel: 2, rockCount: 14, bases });
-}
+export const heliosForge = () => arena({
+  id: 'battle-helios-forge', name: 'Helios Forge', palette: 'helios', side: 30, start: 'corners', thorium: 2, rocks: 14,
+  walls: [
+    [[0, 11], [7, 11], [7, 9], [10, 9], [10, 4]],
+    [[9, 14], [9, 12], [12, 12], [12, 10], [13, 10]],
+  ], pits: [[14, 13], [14, 14], [13, 14]],
+});
 
-/** 48x30, patch 1.03: lava rivers with narrow bridges; players choose their base tile. */
-export function heliosFurnace(): MapDef {
-  const id = 'battle-helios-furnace';
-  const c = canvas(48, 30, 'mirror4');
-  const bases = [null, null, null, null];
-  const rnd = rngFor(id);
-  rim(c, 1, 5);
-  line(c, 12, 2, 12, 12, 'o');
-  line(c, 13, 2, 13, 12, 'o');
-  line(c, 12, 12, 22, 12, 'o');
-  line(c, 12, 13, 22, 13, 'o');
-  box(c, 12, 6, 13, 8, '.');
-  box(c, 17, 12, 18, 13, '.');
-  box(c, 23, 2, 24, 8, '#');
-  scatter(c, rnd, 5, { x0: 2, y0: 14, x1: 10, y1: 27 }, '#', 2);
-  scatter(c, rnd, 4, { x0: 25, y0: 3, x1: 40, y1: 8 }, '#', 2);
-  return finish(c, { id, name: 'Helios Furnace', palette: 'helios', thoriumLevel: 3, rockCount: 15, bases });
-}
+export const heliosFurnace = () => arena({
+  id: 'battle-helios-furnace', name: 'Helios Furnace', palette: 'helios', side: 30, start: 'free', thorium: 3, rocks: 15,
+  walls: [
+    [[2, 8], [11, 8], [11, 4], [14, 4]], [[0, 12], [6, 12], [6, 14]],
+    [[10, 14], [10, 11], [13, 11]],
+  ], pits: [[8, 6], [9, 6], [9, 5], [12, 13]],
+});
 
-/** 46x30, four starts around a central magma lake inside a caldera wall breached on all four sides. */
-export function heliosCaldera(): MapDef {
-  const id = 'battle-helios-caldera';
-  const c = canvas(46, 30, 'mirror4');
-  const bases = corners(46, 30, 6, 5);
-  const rnd = rngFor(id);
-  rim(c, 1, 5);
-  ring(c, 23, 15, 6.5, 7.6, '#');
-  ring(c, 23, 15, 0, 4.2, 'o');
-  box(c, 21, 6, 22, 9, '.');
-  box(c, 14, 14, 17, 14, '.');
-  box(c, 13, 4, 14, 8, '#');
-  line(c, 7, 12, 11, 10, 'o');
-  scatter(c, rnd, 5, { x0: 15, y0: 2, x1: 20, y1: 7 }, '#', 2);
-  scatter(c, rnd, 3, { x0: 3, y0: 11, x1: 12, y1: 13 }, 'o', 1);
-  clearZone(c, bases, 4);
-  return finish(c, { id, name: 'Helios Caldera', palette: 'helios', thoriumLevel: 2, rockCount: 15, bases });
-}
+export const heliosCaldera = () => arena({
+  id: 'battle-helios-caldera', name: 'Helios Caldera', palette: 'helios', side: 30, start: 'corners', thorium: 2, rocks: 15,
+  walls: [
+    [[13, 7], [11, 7], [11, 9], [9, 9], [9, 11], [7, 11], [7, 14]],
+    [[9, 2], [9, 5], [12, 5]], [[2, 8], [4, 8], [4, 12]],
+  ], pits: [[14, 14], [13, 14], [13, 13], [14, 12], [14, 13], [12, 14]],
+});
 
-/** 42x28: diagonal vent fissures and a basalt core split the field; players choose their base tile. */
-export function heliosVents(): MapDef {
-  const id = 'battle-helios-vents';
-  const c = canvas(42, 28, 'rot2');
-  const bases = [null, null, null, null];
-  const rnd = rngFor(id);
-  rim(c, 1, 5);
-  line(c, 6, 20, 16, 10, 'o');
-  line(c, 7, 20, 17, 10, 'o');
-  box(c, 10, 14, 13, 16, '.');
-  line(c, 20, 2, 20, 8, 'o');
-  box(c, 19, 12, 22, 15, '#');
-  box(c, 28, 4, 31, 5, '#');
-  scatter(c, rnd, 6, { x0: 2, y0: 2, x1: 17, y1: 9 }, '#', 2);
-  scatter(c, rnd, 3, { x0: 24, y0: 9, x1: 36, y1: 13 }, 'o', 1);
-  return finish(c, { id, name: 'Helios Vents', palette: 'helios', thoriumLevel: 3, rockCount: 14, bases });
-}
+export const heliosVents = () => arena({
+  id: 'battle-helios-vents', name: 'Helios Vents', palette: 'helios', side: 30, start: 'free', thorium: 3, rocks: 14,
+  walls: [
+    [[7, 1], [7, 7], [9, 7], [9, 10], [12, 10], [12, 12]],
+    [[2, 12], [5, 12], [5, 14]], [[12, 3], [14, 3]],
+  ], pits: [[8, 5], [8, 6], [10, 9], [14, 14]],
+});

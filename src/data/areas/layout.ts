@@ -61,7 +61,8 @@ export class Layout {
 
   /**
    * Picks up to n tiles around `center` between rMin and rMax (Chebyshev), at least 2 apart from every
-   * placed structure. `front` orders them toward the opposing base first, otherwise away from it.
+   * placed structure (widening past rMax when too few fit). `front` orders them toward the opposing base first,
+   * otherwise away from it.
    */
   pick(n: number, center: Tile, rMin: number, rMax: number, front: boolean, toward: Tile = this.human): Tile[] {
     const cand: Tile[] = [];
@@ -79,6 +80,10 @@ export class Layout {
     for (const t of cand) {
       if (out.length >= n) break;
       if (out.every((o) => Math.max(Math.abs(o.tx - t.tx), Math.abs(o.ty - t.ty)) >= 2) && this.claim(t)) out.push(t);
+    }
+    // Cramped spots (original rock grids) widen the search ring instead of dropping sites.
+    if (out.length < n && rMax < Math.max(this.map.w, this.map.h)) {
+      out.push(...this.pick(n - out.length, center, rMax + 1, rMax + 2, front, toward));
     }
     return out;
   }

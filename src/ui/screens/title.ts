@@ -3,11 +3,11 @@ import { Form, buttonRows } from '../menus/form';
 import { drawForm } from '../menus/formDraw';
 import { drawFooter } from './common';
 import { createBattleScreen } from './battle';
-import { createCampaignScreen } from './campaign';
+import { createCampaignPacks } from './campaignPacks';
 import { createControlsScreen } from './controls';
-import { createJoinOnlineScreen } from './joinOnline';
 import { createLeaderboardsScreen } from './leaderboards';
 import { drawLogo } from './logo';
+import { createMultiplayerScreen } from './multiplayer';
 import { createSettingsScreen } from './settings';
 import { createTrophiesScreen } from './trophies';
 import type { Screen } from './types';
@@ -15,12 +15,11 @@ import type { Screen } from './types';
 const ITEMS = [
   { id: 'campaign', label: 'Campaign', icon: 'comet' },
   { id: 'battle', label: 'Battle', icon: 'sword' },
-  { id: 'joinOnline', label: 'Join Online', icon: 'target' },
-  { id: 'settings', label: 'Settings', icon: 'cross' },
-  { id: 'controls', label: 'Controls', icon: 'target' },
+  { id: 'multiplayer', label: 'Multiplayer', icon: 'players' },
+  { id: 'settings', label: 'Settings', icon: 'gear' },
+  { id: 'controls', label: 'Controls', icon: 'gamepad' },
   { id: 'leaderboards', label: 'Leaderboards', icon: 'star' },
   { id: 'trophies', label: 'Trophies', icon: 'trophy' },
-  { id: 'quit', label: 'Quit', icon: 'arrow' },
 ];
 
 export function createTitleScreen(): Screen {
@@ -30,14 +29,13 @@ export function createTitleScreen(): Screen {
     update(nav, dt) {
       const ev = form.handle(nav, dt);
       switch (ev.activated) {
-        case 'campaign': return { t: 'push', screen: createCampaignScreen() };
+        case 'campaign': return { t: 'push', screen: createCampaignPacks() };
         case 'battle': return { t: 'push', screen: createBattleScreen() };
-        case 'joinOnline': return { t: 'push', screen: createJoinOnlineScreen() };
+        case 'multiplayer': return { t: 'push', screen: createMultiplayerScreen() };
         case 'settings': return { t: 'push', screen: createSettingsScreen() };
         case 'controls': return { t: 'push', screen: createControlsScreen() };
         case 'leaderboards': return { t: 'push', screen: createLeaderboardsScreen() };
         case 'trophies': return { t: 'push', screen: createTrophiesScreen() };
-        case 'quit': return { t: 'quit' };
         default: return null;
       }
     },

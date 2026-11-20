@@ -8,9 +8,11 @@ import type { Leaderboards } from './leaderboard';
 import { newTrophyProgress, sanitizeTrophyProgress } from './trophies';
 import type { TrophyProgress } from './trophies';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const AREAS_PER_COMET = 7;
 export const COMET_ORDER: readonly CometId[] = ['kreios', 'hathor', 'aether', 'helios'];
+export const EXPANSION_ORDER: readonly CometId[] = ['gaia', 'kronos'];
+const ALL_COMETS = [...COMET_ORDER, ...EXPANSION_ORDER];
 const DIFFICULTIES: readonly Difficulty[] = ['beginner', 'casual', 'normal', 'expert'];
 
 export interface AreaRecord {
@@ -52,7 +54,7 @@ export const emptyAreas = (): (AreaRecord | null)[] => Array.from({ length: AREA
 
 export function newSave(): SaveData {
   const comets = {} as Record<CometId, CometProgress>;
-  for (const id of COMET_ORDER) comets[id] = { areas: emptyAreas(), resurgence: emptyAreas() };
+  for (const id of ALL_COMETS) comets[id] = { areas: emptyAreas(), resurgence: emptyAreas() };
   return { version: SAVE_VERSION, comets, lastPlayed: null, settings: DEFAULT_SETTINGS, leaderboards: {}, trophies: newTrophyProgress() };
 }
 
@@ -61,7 +63,8 @@ export const MIGRATIONS: Record<number, (old: Record<string, unknown>) => Record
 
 export function migrate(raw: unknown): Record<string, unknown> | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  let doc = raw as Record<string, unknown>;
+  // v2 adds comet records: sanitizeSave fills missing records without changing v1 progress.
+  let doc = { ...raw } as Record<string, unknown>;
   let v = typeof doc.version === 'number' ? doc.version : 0;
   while (v < SAVE_VERSION) {
     const step = MIGRATIONS[v];
@@ -96,7 +99,7 @@ function sanitizeAreas(raw: unknown): (AreaRecord | null)[] {
 function sanitizeLastPlayed(raw: unknown): LastPlayed | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if (!COMET_ORDER.includes(r.cometId as CometId) || !finite(r.index)) return null;
+  if (!ALL_COMETS.includes(r.cometId as CometId) || !finite(r.index)) return null;
   return {
     cometId: r.cometId as CometId,
     index: Math.min(AREAS_PER_COMET - 1, Math.max(0, Math.floor(r.index))),
@@ -112,7 +115,7 @@ export function sanitizeSave(raw: unknown): SaveData {
   if (!doc) return newSave();
   const comets = {} as Record<CometId, CometProgress>;
   const rawComets = typeof doc.comets === 'object' && doc.comets !== null ? (doc.comets as Record<string, Record<string, unknown>>) : {};
-  for (const id of COMET_ORDER) {
+  for (const id of ALL_COMETS) {
     const c = rawComets[id] ?? {};
     comets[id] = { areas: sanitizeAreas(c.areas), resurgence: sanitizeAreas(c.resurgence) };
   }

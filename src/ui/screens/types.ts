@@ -6,6 +6,7 @@ import type { NetHooks } from '../../net/types';
 
 /** Campaign area as shown on the map and in the briefing. Provided by the campaign data (screens never import sim code). */
 export interface AreaSummary {
+  rows?: readonly string[];
   cometId: CometId;
   /** 0-based index within the comet (0..6). Resurgence maps use their own 0-based index. */
   index: number;
@@ -94,6 +95,7 @@ export interface UiNav {
 
 /** Data the shell keeps fresh; screens read it each frame. */
 export interface UiData {
+  unlockMaps?: boolean;
   save: SaveData;
   areas: readonly AreaSummary[];
   maps: readonly BattleMapSummary[];

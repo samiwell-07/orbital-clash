@@ -16,14 +16,14 @@ Caveat: all references are low-res/compressed (video 470x360). Colours below are
 | Pitch | ~65-75° from horizontal | **62°** below horizon (so tower walls read, trains look 3D) |
 | Yaw | 0 (screen-up = map north, -y) | 0 |
 | Target | Whole plateau always visible, no scrolling | Map centre `(MAP_W/2, 0, MAP_H/2)` |
-| Distance | n/a | **64 tiles** from target for the 48x30 map (see below) |
-| Camera position | n/a | `(24, 56.5, 45)` looking at `(24, 0, 15)`; `near 1`, `far 400` |
+| Distance | n/a | **~64 tiles** from target for a 30x30 plateau at 16:9 |
+| Camera position | n/a | South of and above the actual map centre; `near 1`, `far 400` |
 | Cursor/ship zoom | none | none (fixed camera). Optional 0.5 s ease-in "intro dolly" from distance 80 to 64 |
 | Screen shake | none noticed | trauma-based, max 0.35 tile, only on base hit / big bomber blast, decays 1.8/s |
 
-Derivation (so other aspect ratios can recompute): `D = (visibleDepthTiles/2) / tan(fov/2)`; vertical visible depth = `MAP_H / sin(pitch)` + 10 % margin; at 16:9 the horizontal half-fov is 23.9° so a 48-tile map plus a ~7-tile-wide left HUD sidebar fits at D=64. For 4:3 (patch 1.02 layout) keep D and let the HUD live in the bottom band (see §9).
+Fit the four ground corners to the available frustum, with a 6% margin. The board remains square in world space regardless of viewport aspect ratio; the pitched camera gives it perspective.
 
-**Tile size on screen** [observed]: in the references a tower occupies one grid cell and the playfield is roughly 32-34 columns x 22-26 rows; one tile is ~3 % of playfield width (~55 px on a 1360 px playfield, ~11 px in the 360p video). Our default map is 48x30, so at 1920x1080 one tile is ~32 px wide at the screen centre. Units are drawn at 0.12-0.2 tile; an army train is ~1-1.5 tiles wide.
+**Tile readability:** one visible floor square equals one placement cell. Use material variation for texture, not a second grid. Fixed cliff tiles join into walls; leave adjacent walkable cells visibly clear. A tower still occupies one cell.
 
 Letterbox: HUD sits over a dark, rounded frame; the playfield rectangle is bordered by a thin black line and a 1-tile dark rim (§3).
 

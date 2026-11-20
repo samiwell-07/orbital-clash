@@ -1,4 +1,4 @@
-import type { Difficulty, Objective, System, World } from '@/types';
+import type { CometId, Difficulty, Objective, System, World } from '@/types';
 import { DIFFICULTY_MULT, TICK_DT } from '@/config/constants';
 import { campaignState, humanIds, isCampaign, scriptIds } from './state';
 
@@ -13,7 +13,7 @@ export interface ObjectiveProgress {
 
 export interface CampaignResult {
   missionId: string;
-  comet: string;
+  comet: CometId;
   index: number;
   resurgence: boolean;
   difficulty: Difficulty;

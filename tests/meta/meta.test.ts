@@ -169,6 +169,30 @@ describe('save and campaign unlocks', () => {
     const a = worse.save.comets.kreios.areas[0]!;
     expect([a.bestTimeSec, a.bestScore, a.bestRank, a.completions, a.lastDifficulty, a.coopPlayers]).toEqual([85, 9000, 'A', 2, 'expert', 2]);
   });
+  it('loads a v1 save at its original key and adds an independently playable expansion', () => {
+    const st = memoryStorage();
+    const base = complete(newSave(), 'kreios', 0).save;
+    submitScore(base.leaderboards, boardKey('kreios', 0, 'normal'), 'Pilot', 9000, 85);
+    const { kreios, hathor, aether, helios } = base.comets;
+    st.setItem(SAVE_KEY, JSON.stringify({ ...base, version: 1, comets: { kreios, hathor, aether, helios } }));
+    let s = loadSave(st);
+    expect(s).toEqual(base);
+    expect(isAreaUnlocked(s, 'gaia', 0)).toBe(true);
+    expect(isAreaUnlocked(s, 'gaia', 0, true)).toBe(false);
+    expect(isCometUnlocked(s, 'kronos')).toBe(false);
+    for (let i = 0; i < 7; i++) {
+      expect(isAreaUnlocked(s, 'gaia', i)).toBe(true);
+      const rec = complete(s, 'gaia', i);
+      expect(rec.nextCometJustUnlocked).toBe(i === 6 ? 'kronos' : null);
+      s = rec.save;
+    }
+    expect(isAreaUnlocked(s, 'gaia', 0, true)).toBe(true);
+    expect(isAreaUnlocked(s, 'kronos', 0)).toBe(true);
+    expect(isCometUnlocked(s, 'hathor')).toBe(false);
+    s = complete(s, 'gaia', 0, true).save;
+    saveSave(s, st);
+    expect(loadSave(st)).toEqual(s);
+  });
   it('round-trips through storage and survives corrupt data', () => {
     const st = memoryStorage();
     const s = complete(newSave(), 'kreios', 0).save;

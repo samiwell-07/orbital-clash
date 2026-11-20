@@ -18,6 +18,7 @@ export { createTrophiesScreen } from './screens/trophies';
 export { createLobbyScreen } from './screens/lobby';
 export type { LobbyOptions, LobbyScreen } from './screens/lobby';
 export { createJoinOnlineScreen } from './screens/joinOnline';
+export { createMultiplayerScreen } from './screens/multiplayer';
 export { createRemoteLobbyScreen, ROOM_CLOSED_NOTICE_SEC } from './screens/remoteLobby';
 export { drawLobbyView } from './screens/lobbyDraw';
 export type { LobbyViewLike, LobbyDrawOptions, LobbyOnlineBanner } from './screens/lobbyDraw';

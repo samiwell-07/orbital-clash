@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Difficulty, Mission, Objective, SimEvent } from '@/types';
 import { createSim, hitBase, removeStructure } from '@/sim/core';
 import { campaignResult, objectiveProgress, setReleaseHandler, startCampaign } from '@/sim/modes/campaign';
+import { territoryTiles } from '@/sim/modes/campaign/garrison';
 import { ALL_MISSIONS } from '@/data/areas';
 
 beforeEach(() => setReleaseHandler(() => undefined));
@@ -35,6 +36,22 @@ describe('startCampaign', () => {
     sim.step([]);
     expect([...w.structures.values()].filter((s) => s.scripted)).toHaveLength(base.preplaced.length + 0);
     expect(Object.values(w.players[1].stored).reduce((a, b) => a + (b ?? 0), 0)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('mans every free tile of the enemy territory once, and the garrison holds still', () => {
+    const { sim, w } = make();
+    sim.step([]);
+    sim.step([]);
+    const key = (x: number, y: number) => `${Math.floor(x)},${Math.floor(y)}`;
+    const tiles = territoryTiles(w, 1);
+    const guards = w.units.filter((u) => u.state === 'guarding');
+    expect(tiles.length).toBeGreaterThan(100);
+    expect(guards.every((u) => u.owner === 1)).toBe(true);
+    expect(new Set(guards.map((u) => key(u.x, u.y)))).toEqual(new Set(tiles.map((t) => key(t.tx, t.ty))));
+    expect(guards).toHaveLength(tiles.length);
+    const before = guards.map((u) => [u.x, u.y]);
+    for (let i = 0; i < 120; i++) sim.step([]);
+    expect(guards.map((u) => [u.x, u.y])).toEqual(before);
   });
 });
 

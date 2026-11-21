@@ -13,7 +13,7 @@ import type { Player } from '@/types';
 import { angleDiff, approachAngle, bobHeight, snakeBobPhase } from '@/render/models/motion';
 import { BoxGeometry, Matrix4, Mesh, MeshBasicMaterial } from 'three';
 import type { Material, MeshStandardMaterial } from 'three';
-import { buildShipCraft } from '@/render/models/ship';
+import { buildShipCraft, hasShipModel } from '@/render/models/ship';
 import { createShipPreview } from '@/render/preview';
 
 describe('SlotAllocator / InstancedPool', () => {
@@ -118,6 +118,13 @@ describe('ship craft', () => {
 
   it('returns no preview (instead of throwing) without WebGL', () => {
     expect(createShipPreview(64)).toBeNull();
+  });
+
+  it('gives no ship to the scripted campaign enemy', () => {
+    expect(hasShipModel({ controller: 'human', alive: true })).toBe(true);
+    expect(hasShipModel({ controller: 'adaptive', alive: true })).toBe(true);
+    expect(hasShipModel({ controller: 'script', alive: true })).toBe(false);
+    expect(hasShipModel({ controller: 'human', alive: false })).toBe(false);
   });
 });
 

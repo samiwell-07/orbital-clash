@@ -3,6 +3,7 @@ import { DEFAULT_HITS, DIFFICULTY_MULT, MAX_COOP_PLAYERS } from '@/config/consta
 import '@/data/areas';
 import { seedFor } from '@/data/areas/seeds';
 import { placeStructure } from './actions';
+import { deployGarrison } from './garrison';
 import { campaignState, scriptIds } from './state';
 
 export const HUMAN_SLOT_IDS: readonly PlayerId[] = [0, 2, 3, 4];
@@ -67,6 +68,8 @@ export function applyMissionSetup(w: World, emit?: Emit): string[] {
     if (err) errors.push(`preplaced ${err}`);
   }
   seedStored(w, mission);
+  // The enemy starts with its whole territory manned; scripted releases send these troops first.
+  for (const id of scriptIds(w)) deployGarrison(w, id);
   const first = HUMAN_SLOT_IDS.find((id) => w.players[id]?.controller === 'human');
   if (mission.teaches && first !== undefined) push({ t: 'techUnlocked', owner: first, key: mission.teaches });
   return errors;

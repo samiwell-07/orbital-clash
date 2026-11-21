@@ -89,10 +89,12 @@ describe('timeline runner', () => {
     sim.world.tick = 60 * 100;
     timelineSystem(sim.world, 1 / 60, (e) => emitted.push(e));
     timelineSystem(sim.world, 1 / 60, (e) => emitted.push(e));
-    const kinds = emitted.map((e) => (e.t === 'message' ? e.text : e.t));
+    const kinds = emitted.filter((e) => e.t !== 'unitLaunched').map((e) => (e.t === 'message' ? e.text : e.t));
     expect(kinds.slice(-4)).toEqual(['a', 'b', 'thorium', 'structureBuilt']);
     expect(sim.world.timelineCursor).toBe(6);
-    expect(launches.map((l) => l.split(':').slice(2).join(':'))).toEqual(['scout:2', 'scout:4']);
+    // The garrison answers both releases (front line first), so the base launches nothing.
+    expect(emitted.flatMap((e) => (e.t === 'unitLaunched' ? [`${e.kind}:${e.count}`] : []))).toEqual(['scout:2', 'scout:4']);
+    expect(launches).toEqual([]);
     expect(emitted.filter((e) => e.t === 'structureBuilt')).toHaveLength(base.preplaced.length + 1);
   });
 
@@ -154,18 +156,31 @@ describe('timeline runner', () => {
       structures = w.structures.size;
     }
     expect(violations).toEqual([]);
-    expect(w.units).toHaveLength(0);
-    expect(launches.length).toBeGreaterThan(0);
+    expect(w.units.every((u) => u.owner === 1)).toBe(true);
+    expect(launches.length + w.players[1].stats.unitsLaunched).toBeGreaterThan(0);
   });
 
-  it('release drains stored units into the handler', () => {
-    const m = custom('t-rel', [[0.5, { a: 'release', kind: 'scout', count: 10 }], [1, { a: 'release', kind: 'all', count: 'all' }]]);
-    const sim = make(m);
-    run(sim, 2);
-    expect(launches[0]).toMatch(/:1:scout:10$/);
-    // 'all' also launches whatever the preplaced towers produced meanwhile.
-    expect(launches.filter((l) => l.includes(':scout:'))).toHaveLength(2);
-    expect(sim.world.players[1].stored.scout ?? 0).toBeLessThanOrEqual(2);
+  it('release sends the garrison first, front line first, then launches from stored', () => {
+    const w = createWorld(startCampaign({ mission: custom('t-rel', []), difficulty: 'normal', seed: 7 }));
+    applyMissionSetup(w, () => undefined);
+    const guards = () => w.units.filter((u) => u.state === 'guarding' && u.kind === 'scout');
+    const n = guards().length;
+    expect(n).toBeGreaterThan(100);
+    const human = w.players[0];
+    const d = (u: { x: number; y: number }) => Math.hypot(u.x - human.baseTx - 0.5, u.y - human.baseTy - 0.5);
+    const noop = () => undefined;
+    expect(executeAction(w, 1, { a: 'release', kind: 'scout', count: 3 }, { dry: false }, noop)).toBeNull();
+    const sent = w.units.filter((u) => u.state === 'marching');
+    expect(sent).toHaveLength(3);
+    expect(Math.max(...sent.map(d))).toBeLessThanOrEqual(Math.min(...guards().map(d)));
+    expect(launches).toEqual([]);
+    w.players[1].stored.scout = 5;
+    expect(executeAction(w, 1, { a: 'release', kind: 'scout', count: n }, { dry: false }, noop)).toBeNull();
+    expect(guards()).toHaveLength(0);
+    expect(launches).toEqual(['0:1:scout:3']);
+    expect(w.players[1].stored.scout).toBe(2);
+    expect(executeAction(w, 1, { a: 'release', kind: 'all', count: 'all' }, { dry: false }, noop)).toBeNull();
+    expect(launches[1]).toBe('0:1:scout:2');
   });
 
   it('surfaces a missing release handler as a mission error and stops the timeline', () => {

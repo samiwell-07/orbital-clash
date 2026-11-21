@@ -3,6 +3,7 @@ import { ALL_UNITS, WEAPONS } from '@/types';
 import { ALL_TECH_KEYS, SPAWN_TOWER_DEFS, SUPPORT_DEFS, UNIT_DEFS, WEAPON_DEFS, isUnlocked } from '@/data';
 import { addStructure, isTerrainBlocked, occupantAt, structureAt, wouldBlockPath } from '@/sim/core';
 import { HP_PER_LEVEL } from '@/sim/build/info';
+import { guardCount, wakeGuards } from './garrison';
 import { campaignState, humanIds } from './state';
 
 /** Launches `count` units already drained from the owner's stored counts (bound to the army-snake API). */
@@ -108,11 +109,12 @@ function release(w: World, owner: PlayerId, a: Extract<ScriptAction, { a: 'relea
   const p = w.players[owner];
   if (!ctx.dry && !releaseHandler) return 'release: no release handler bound (setReleaseHandler)';
   if (a.kind === 'all' && a.count !== 'all') return 'release: kind "all" requires count "all"';
-  const kinds = a.kind === 'all' ? ALL_UNITS.filter((k) => (p.stored[k] ?? 0) > 0) : [a.kind];
+  const avail = (k: UnitKind) => (p.stored[k] ?? 0) + guardCount(w, owner, k);
+  const kinds = a.kind === 'all' ? ALL_UNITS.filter((k) => avail(k) > 0) : [a.kind];
   if (kinds.length === 0) return 'release: no stored units to release';
   const taken: [UnitKind, number][] = [];
   for (const k of kinds) {
-    const have = p.stored[k] ?? 0;
+    const have = avail(k);
     const n = a.count === 'all' ? have : a.count;
     if (!Number.isInteger(n) || n <= 0) return `release ${k}: invalid count ${String(a.count)}`;
     if (n > have) return `release ${k}: wants ${n} but only ${have} stored`;
@@ -120,8 +122,11 @@ function release(w: World, owner: PlayerId, a: Extract<ScriptAction, { a: 'relea
   }
   if (!ctx.dry) aimRelease(w, owner);
   for (const [k, n] of taken) {
-    p.stored[k] = (p.stored[k] ?? 0) - n;
-    if (!ctx.dry && releaseHandler) releaseHandler(w, owner, k, n, emit);
+    // Garrison troops in the field go first (front line first); the base launches the rest.
+    const rest = n - wakeGuards(w, owner, k, n, p.attack.targetPlayer, emit);
+    if (rest <= 0) continue;
+    p.stored[k] = (p.stored[k] ?? 0) - rest;
+    if (!ctx.dry && releaseHandler) releaseHandler(w, owner, k, rest, emit);
   }
   return null;
 }

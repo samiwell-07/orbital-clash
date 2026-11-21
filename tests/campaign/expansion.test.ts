@@ -61,7 +61,7 @@ describe('Gaia and Kronos', () => {
     };
     const nursery = setup('gaia', 0);
     expect(new Set(purchasableResearch(nursery, 0).map(r => r.key))).toEqual(new Set(BIONIC_TECH_KEYS));
-    expect(nursery.players[1].stored.snake).toBeGreaterThan(0);
+    expect((nursery.players[1].stored.snake ?? 0) + nursery.units.filter((u) => u.owner === 1 && u.kind === 'snake').length).toBeGreaterThan(0);
     const relay = setup('kronos', 3);
     expect(fireMissiles(relay, 0, () => undefined)).toBe(1);
   });

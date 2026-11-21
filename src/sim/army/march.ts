@@ -112,6 +112,7 @@ export const marchSystem: System = (w, dt, emit) => {
       killUnit(w, u, emit);
       continue;
     }
+    if (u.state === 'guarding') continue;
     const link = linkOf(u) ?? adopt(u);
     if (behaviors) {
       const b = getUnitBehavior(u.kind);

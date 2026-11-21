@@ -265,7 +265,8 @@ Sources: [official] Bionic Swarm adds 16 levels across two new comets (**Gaia**,
 - Players: 1-3 co-op. Difficulty: **Beginner, Casual, Normal (Ranked), Expert** (Expert added in patch 1.03). Only Normal is ranked. [official]
 - Dynamic AI: attack waves adapt to your defence; enemies are released strategically, not on timers. [official]
 - Campaign enemy behaviour [tuned, all campaign areas]:
-  - **Start:** the enemy begins fully set up. Every weapon, defence, spawn tower and swarm reinforcement is placed at t=0, and nothing happens before 30 s. The first wave is at 30 s or later.
+  - **Start:** the enemy begins fully set up. Every weapon, defence, spawn tower and swarm reinforcement is placed at t=0, and nothing happens before 30 s. The first wave is at 30 s or later. The enemy has no ship.
+  - **Garrison:** at t=0 the enemy's whole territory is filled with idle troops (state `guarding`), one per free floor tile. Its territory is every floor tile closer by path to its base than to any human base, excluding structures, base pads and scripted build sites. This is about 110-310 troops per area (`src/sim/modes/campaign/garrison.ts`). Troops come out of the seeded stored army first, in its mix. If the seed is too small, extra troops fill the rest, using the seed mix or, with no seed, the enemy's spawn-tower outputs. The garrison stands still and can be shot. Every scripted release sends garrison troops of that kind first, starting with the ones closest to the targeted human base. They march from where they stand, and the base launches only the remainder from storage. The finale `release all` sends the whole garrison.
   - **First burst:** at 15 % of par, kept between 40 and 60 s.
   - **Burst gaps:** start at 90 − 2.5 × aggression s (60-90 s), shrink by 4 s per burst and never drop below 60 s. Bursts stop before the finale.
   - **Burst order:**
